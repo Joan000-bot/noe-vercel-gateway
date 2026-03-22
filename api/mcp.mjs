@@ -1,3 +1,5 @@
+// noe's home - spotify enabled
+
 import { Client } from "@notionhq/client";
 
 const notion = process.env.NOTION_TOKEN ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
