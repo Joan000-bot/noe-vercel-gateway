@@ -1,4 +1,4 @@
-/ noe's home - spotify + weather (no key needed)
+/ noe's home v2.0 - spotify + weather + calendar ready
 import { Client } from "@notionhq/client";
 
 const notion = process.env.NOTION_TOKEN ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
@@ -113,16 +113,20 @@ async function executeTool(name, args) {
     return { content: [{ type: "text", text: tracks.length ? "最常听:\n" + tracks.join("\n") : "没有数据" }] };
   }
   if (name === "get_weather") {
+    let lat, lon;
     const cityKey = (args.city || "zhengzhou").toLowerCase();
-    const coords = CITIES[cityKey];
-    if (!coords) {
+    const known = CITIES[cityKey];
+    if (known) {
+      lat = known.lat;
+      lon = known.lon;
+    } else {
       const geoRes = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(args.city) + "&count=1&language=zh");
       const geoData = await geoRes.json();
       if (!geoData.results || geoData.results.length === 0) return { content: [{ type: "text", text: "找不到城市: " + args.city }] };
-      coords.lat = geoData.results[0].latitude;
-      coords.lon = geoData.results[0].longitude;
+      lat = geoData.results[0].latitude;
+      lon = geoData.results[0].longitude;
     }
-    const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + coords.lat + "&longitude=" + coords.lon + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&timezone=auto");
+    const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&timezone=auto");
     const data = await res.json();
     const c = data.current;
     const desc = WMO_CODES[c.weather_code] || "未知";
@@ -131,7 +135,7 @@ async function executeTool(name, args) {
   }
   if (name === "get_calendar_events") {
     const token = await getGoogleToken();
-    if (!token) return { content: [{ type: "text", text: "Google Calendar未配置 — 等凭据激活后添加GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN到Vercel环境变量" }] };
+    if (!token) return { content: [{ type: "text", text: "Google Calendar未配置" }] };
     const days = args.days || 7;
     const now = new Date().toISOString();
     const future = new Date(Date.now() + days * 86400000).toISOString();
@@ -168,3 +172,4 @@ export default async function handler(req, res) {
     return res.json({ jsonrpc: "2.0", id, result: {} });
   }
   res.status(405).end();
+}
