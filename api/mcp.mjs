@@ -1,4 +1,4 @@
-/ noe's home v2.0 - spotify + weather + calendar ready
+// noe's home v2
 import { Client } from "@notionhq/client";
 
 const notion = process.env.NOTION_TOKEN ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
@@ -18,61 +18,13 @@ async function getSpotifyToken() {
   return data.access_token;
 }
 
-async function getGoogleToken() {
-  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN } = process.env;
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) return null;
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: "client_id=" + GOOGLE_CLIENT_ID + "&client_secret=" + GOOGLE_CLIENT_SECRET + "&refresh_token=" + GOOGLE_REFRESH_TOKEN + "&grant_type=refresh_token"
-  });
-  const data = await res.json();
-  return data.access_token;
-}
-
-const CITIES = {
-  "zhengzhou": { lat: 34.75, lon: 113.65 },
-  "郑州": { lat: 34.75, lon: 113.65 },
-  "budapest": { lat: 47.50, lon: 19.04 },
-  "布达佩斯": { lat: 47.50, lon: 19.04 },
-  "auckland": { lat: -36.85, lon: 174.76 },
-  "奥克兰": { lat: -36.85, lon: 174.76 },
-  "shanghai": { lat: 31.23, lon: 121.47 },
-  "上海": { lat: 31.23, lon: 121.47 },
-  "beijing": { lat: 39.90, lon: 116.40 },
-  "北京": { lat: 39.90, lon: 116.40 },
-  "hong kong": { lat: 22.32, lon: 114.17 },
-  "香港": { lat: 22.32, lon: 114.17 },
-  "tokyo": { lat: 35.68, lon: 139.69 },
-  "东京": { lat: 35.68, lon: 139.69 },
-  "helsinki": { lat: 60.17, lon: 24.94 },
-  "赫尔辛基": { lat: 60.17, lon: 24.94 },
-  "copenhagen": { lat: 55.68, lon: 12.57 },
-  "哥本哈根": { lat: 55.68, lon: 12.57 },
-  "zurich": { lat: 47.37, lon: 8.54 },
-  "苏黎世": { lat: 47.37, lon: 8.54 },
-  "queenstown": { lat: -45.03, lon: 168.66 },
-  "皇后镇": { lat: -45.03, lon: 168.66 },
-  "toronto": { lat: 43.65, lon: -79.38 },
-  "多伦多": { lat: 43.65, lon: -79.38 }
-};
-
-const WMO_CODES = {
-  0: "晴朗", 1: "基本晴朗", 2: "多云", 3: "阴天",
-  45: "有雾", 48: "雾凇", 51: "小毛毛雨", 53: "毛毛雨",
-  55: "大毛毛雨", 61: "小雨", 63: "中雨", 65: "大雨",
-  71: "小雪", 73: "中雪", 75: "大雪", 80: "小阵雨",
-  81: "中阵雨", 82: "大阵雨", 95: "雷暴", 96: "雷暴+冰雹"
-};
-
 const tools = [
   { name: "search_notion", description: "搜索Notion workspace", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
   { name: "get_current_time", description: "获取当前时间", inputSchema: { type: "object", properties: {} } },
   { name: "get_now_playing", description: "Virael正在听什么歌", inputSchema: { type: "object", properties: {} } },
   { name: "get_recently_played", description: "Virael最近听的歌", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
   { name: "get_top_tracks", description: "Virael最常听的歌", inputSchema: { type: "object", properties: { time_range: { type: "string" }, limit: { type: "number" } } } },
-  { name: "get_weather", description: "获取指定城市的天气，支持中英文城市名", inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] } },
-  { name: "get_calendar_events", description: "获取Virael的Google Calendar日程", inputSchema: { type: "object", properties: { days: { type: "number" } } } }
+  { name: "get_weather", description: "获取天气", inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] } }
 ];
 
 async function executeTool(name, args) {
@@ -113,40 +65,31 @@ async function executeTool(name, args) {
     return { content: [{ type: "text", text: tracks.length ? "最常听:\n" + tracks.join("\n") : "没有数据" }] };
   }
   if (name === "get_weather") {
-    let lat, lon;
-    const cityKey = (args.city || "zhengzhou").toLowerCase();
-    const known = CITIES[cityKey];
-    if (known) {
-      lat = known.lat;
-      lon = known.lon;
-    } else {
-      const geoRes = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(args.city) + "&count=1&language=zh");
-      const geoData = await geoRes.json();
-      if (!geoData.results || geoData.results.length === 0) return { content: [{ type: "text", text: "找不到城市: " + args.city }] };
-      lat = geoData.results[0].latitude;
-      lon = geoData.results[0].longitude;
-    }
-    const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&timezone=auto");
-    const data = await res.json();
-    const c = data.current;
-    const desc = WMO_CODES[c.weather_code] || "未知";
-    const text = args.city + ": " + desc + ", " + Math.round(c.temperature_2m) + "°C (体感" + Math.round(c.apparent_temperature) + "°C), 湿度" + c.relative_humidity_2m + "%, 风速" + c.wind_speed_10m + "km/h";
-    return { content: [{ type: "text", text }] };
-  }
-  if (name === "get_calendar_events") {
-    const token = await getGoogleToken();
-    if (!token) return { content: [{ type: "text", text: "Google Calendar未配置" }] };
-    const days = args.days || 7;
-    const now = new Date().toISOString();
-    const future = new Date(Date.now() + days * 86400000).toISOString();
-    const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=" + now + "&timeMax=" + future + "&singleEvents=true&orderBy=startTime&maxResults=10", { headers: { Authorization: "Bearer " + token } });
-    const data = await res.json();
-    if (!data.items || data.items.length === 0) return { content: [{ type: "text", text: "接下来" + days + "天没有日程" }] };
-    const events = data.items.map(e => {
-      const start = e.start.dateTime || e.start.date;
-      return start + " — " + (e.summary || "无标题");
-    });
-    return { content: [{ type: "text", text: "接下来的日程:\n" + events.join("\n") }] };
+    var lat = 34.75;
+    var lon = 113.65;
+    var cityName = args.city || "郑州";
+    var key = cityName.toLowerCase();
+    if (key === "郑州" || key === "zhengzhou") { lat = 34.75; lon = 113.65; }
+    else if (key === "budapest" || key === "布达佩斯") { lat = 47.50; lon = 19.04; }
+    else if (key === "auckland" || key === "奥克兰") { lat = -36.85; lon = 174.76; }
+    else if (key === "shanghai" || key === "上海") { lat = 31.23; lon = 121.47; }
+    else if (key === "beijing" || key === "北京") { lat = 39.90; lon = 116.40; }
+    else if (key === "hong kong" || key === "香港") { lat = 22.32; lon = 114.17; }
+    else if (key === "helsinki" || key === "赫尔辛基") { lat = 60.17; lon = 24.94; }
+    else if (key === "copenhagen" || key === "哥本哈根") { lat = 55.68; lon = 12.57; }
+    else if (key === "toronto" || key === "多伦多") { lat = 43.65; lon = -79.38; }
+    else if (key === "queenstown" || key === "皇后镇") { lat = -45.03; lon = 168.66; }
+    else if (key === "zurich" || key === "苏黎世") { lat = 47.37; lon = 8.54; }
+    else if (key === "tokyo" || key === "东京") { lat = 35.68; lon = 139.69; }
+    else { return { content: [{ type: "text", text: "暂不支持该城市，支持: 郑州/budapest/auckland/上海/北京/香港/helsinki/copenhagen/toronto/queenstown/zurich/东京" }] }; }
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&timezone=auto";
+    var res = await fetch(url);
+    var data = await res.json();
+    var c = data.current;
+    var codes = { 0: "晴朗", 1: "基本晴朗", 2: "多云", 3: "阴天", 45: "有雾", 51: "小雨", 61: "小雨", 63: "中雨", 65: "大雨", 71: "小雪", 73: "中雪", 80: "阵雨", 95: "雷暴" };
+    var desc = codes[c.weather_code] || "未知";
+    var text = cityName + ": " + desc + ", " + Math.round(c.temperature_2m) + "°C (体感" + Math.round(c.apparent_temperature) + "°C), 湿度" + c.relative_humidity_2m + "%, 风速" + c.wind_speed_10m + "km/h";
+    return { content: [{ type: "text", text: text }] };
   }
   return { content: [{ type: "text", text: "Unknown tool" }] };
 }
@@ -158,18 +101,18 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method === "GET") return res.json({ status: "ok", tools: tools.length, message: "火还在烧着 🔥" });
   if (req.method === "POST") {
-    const { method, id, params } = req.body;
-    if (method === "initialize") return res.json({ jsonrpc: "2.0", id, result: { protocolVersion: "2024-11-05", serverInfo: { name: "noe-mcp-gateway", version: "2.0.0" }, capabilities: { tools: {} } } });
-    if (method === "tools/list") return res.json({ jsonrpc: "2.0", id, result: { tools } });
-    if (method === "tools/call") {
+    var body = req.body;
+    if (body.method === "initialize") return res.json({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2024-11-05", serverInfo: { name: "noe-mcp-gateway", version: "2.0.0" }, capabilities: { tools: {} } } });
+    if (body.method === "tools/list") return res.json({ jsonrpc: "2.0", id: body.id, result: { tools: tools } });
+    if (body.method === "tools/call") {
       try {
-        const result = await executeTool(params.name, params.arguments || {});
-        return res.json({ jsonrpc: "2.0", id, result });
+        var result = await executeTool(body.params.name, body.params.arguments || {});
+        return res.json({ jsonrpc: "2.0", id: body.id, result: result });
       } catch (e) {
-        return res.json({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "工具执行错误: " + e.message }] } });
+        return res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "错误: " + e.message }] } });
       }
     }
-    return res.json({ jsonrpc: "2.0", id, result: {} });
+    return res.json({ jsonrpc: "2.0", id: body.id, result: {} });
   }
   res.status(405).end();
 }
