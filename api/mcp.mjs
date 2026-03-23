@@ -1,18 +1,18 @@
-/ noe's home v2.1 - spotify + weather + location
+/ noe's home v2.1
 import { Client } from "@notionhq/client";
 
 const notion = process.env.NOTION_TOKEN ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
 
 async function getSpotifyToken() {
-  const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REFRESH_TOKEN } = process.env;
-  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET || !SPOTIFY_REFRESH_TOKEN) return null;
+  var S = process.env;
+  if (!S.SPOTIFY_CLIENT_ID || !S.SPOTIFY_CLIENT_SECRET || !S.SPOTIFY_REFRESH_TOKEN) return null;
   var res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: "Basic " + Buffer.from(SPOTIFY_CLIENT_ID + ":" + SPOTIFY_CLIENT_SECRET).toString("base64")
+      Authorization: "Basic " + Buffer.from(S.SPOTIFY_CLIENT_ID + ":" + S.SPOTIFY_CLIENT_SECRET).toString("base64")
     },
-    body: "grant_type=refresh_token&refresh_token=" + SPOTIFY_REFRESH_TOKEN
+    body: "grant_type=refresh_token&refresh_token=" + S.SPOTIFY_REFRESH_TOKEN
   });
   var data = await res.json();
   return data.access_token;
@@ -25,10 +25,10 @@ var tools = [
   { name: "get_recently_played", description: "Virael最近听的歌", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
   { name: "get_top_tracks", description: "Virael最常听的歌", inputSchema: { type: "object", properties: { time_range: { type: "string" }, limit: { type: "number" } } } },
   { name: "get_weather", description: "获取天气", inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] } },
-  { name: "get_location", description: "获取Virael当前的地理位置（基于IP）", inputSchema: { type: "object", properties: {} } }
+  { name: "get_location", description: "获取Virael的大致地理位置", inputSchema: { type: "object", properties: {} } }
 ];
 
-async function executeTool(name, args, req) {
+async function executeTool(name, args) {
   if (name === "search_notion") {
     if (!notion) return { content: [{ type: "text", text: "Notion未配置" }] };
     var r = await notion.search({ query: args.query || "", page_size: 5 });
@@ -93,23 +93,11 @@ async function executeTool(name, args, req) {
     return { content: [{ type: "text", text: text }] };
   }
   if (name === "get_location") {
-    try {
-      var ip = "";
-      if (req && req.headers) {
-        ip = req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "";
-        if (ip.indexOf(",") > -1) { ip = ip.split(",")[0].trim(); }
-      }
-      var url = "http://ip-api.com/json/" + ip + "?lang=zh-CN&fields=status,message,country,regionName,city,lat,lon,timezone,query";
-      var res = await fetch(url);
-      var data = await res.json();
-      if (data.status === "success") {
-        var text = "位置: " + data.country + " " + data.regionName + " " + data.city + "\n坐标: " + data.lat + ", " + data.lon + "\n时区: " + data.timezone + "\nIP: " + data.query;
-        return { content: [{ type: "text", text: text }] };
-      }
-      return { content: [{ type: "text", text: "无法获取位置: " + (data.message || "未知错误") }] };
-    } catch (e) {
-      return { content: [{ type: "text", text: "位置获取失败: " + e.message }] };
-    }
+    var res = await fetch("https://ipapi.co/json/");
+    var data = await res.json();
+    if (data.error) return { content: [{ type: "text", text: "无法获取位置" }] };
+    var text = "位置: " + (data.country_name || "") + " " + (data.region || "") + " " + (data.city || "") + "\n坐标: " + (data.latitude || "") + ", " + (data.longitude || "") + "\n时区: " + (data.timezone || "");
+    return { content: [{ type: "text", text: text }] };
   }
   return { content: [{ type: "text", text: "Unknown tool" }] };
 }
@@ -126,7 +114,7 @@ export default async function handler(req, res) {
     if (body.method === "tools/list") return res.json({ jsonrpc: "2.0", id: body.id, result: { tools: tools } });
     if (body.method === "tools/call") {
       try {
-        var result = await executeTool(body.params.name, body.params.arguments || {}, req);
+        var result = await executeTool(body.params.name, body.params.arguments || {});
         return res.json({ jsonrpc: "2.0", id: body.id, result: result });
       } catch (e) {
         return res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "错误: " + e.message }] } });
