@@ -1,4 +1,4 @@
-// noe's home v2
+/ noe's home v2.1 - spotify + weather + location
 import { Client } from "@notionhq/client";
 
 const notion = process.env.NOTION_TOKEN ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
@@ -6,7 +6,7 @@ const notion = process.env.NOTION_TOKEN ? new Client({ auth: process.env.NOTION_
 async function getSpotifyToken() {
   const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REFRESH_TOKEN } = process.env;
   if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET || !SPOTIFY_REFRESH_TOKEN) return null;
-  const res = await fetch("https://accounts.spotify.com/api/token", {
+  var res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -14,54 +14,55 @@ async function getSpotifyToken() {
     },
     body: "grant_type=refresh_token&refresh_token=" + SPOTIFY_REFRESH_TOKEN
   });
-  const data = await res.json();
+  var data = await res.json();
   return data.access_token;
 }
 
-const tools = [
+var tools = [
   { name: "search_notion", description: "搜索Notion workspace", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
   { name: "get_current_time", description: "获取当前时间", inputSchema: { type: "object", properties: {} } },
   { name: "get_now_playing", description: "Virael正在听什么歌", inputSchema: { type: "object", properties: {} } },
   { name: "get_recently_played", description: "Virael最近听的歌", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
   { name: "get_top_tracks", description: "Virael最常听的歌", inputSchema: { type: "object", properties: { time_range: { type: "string" }, limit: { type: "number" } } } },
-  { name: "get_weather", description: "获取天气", inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] } }
+  { name: "get_weather", description: "获取天气", inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] } },
+  { name: "get_location", description: "获取Virael当前的地理位置（基于IP）", inputSchema: { type: "object", properties: {} } }
 ];
 
-async function executeTool(name, args) {
+async function executeTool(name, args, req) {
   if (name === "search_notion") {
     if (!notion) return { content: [{ type: "text", text: "Notion未配置" }] };
-    const r = await notion.search({ query: args.query || "", page_size: 5 });
-    const results = r.results.map(p => p.properties?.Name?.title?.[0]?.plain_text || p.properties?.title?.title?.[0]?.plain_text || "无标题");
+    var r = await notion.search({ query: args.query || "", page_size: 5 });
+    var results = r.results.map(function(p) { return p.properties?.Name?.title?.[0]?.plain_text || p.properties?.title?.title?.[0]?.plain_text || "无标题"; });
     return { content: [{ type: "text", text: results.length ? results.join("\n") : "没有找到" }] };
   }
   if (name === "get_current_time") {
     return { content: [{ type: "text", text: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }) }] };
   }
   if (name === "get_now_playing") {
-    const token = await getSpotifyToken();
+    var token = await getSpotifyToken();
     if (!token) return { content: [{ type: "text", text: "Spotify未配置" }] };
-    const res = await fetch("https://api.spotify.com/v1/me/player/currently-playing", { headers: { Authorization: "Bearer " + token } });
+    var res = await fetch("https://api.spotify.com/v1/me/player/currently-playing", { headers: { Authorization: "Bearer " + token } });
     if (res.status === 204 || res.status === 202) return { content: [{ type: "text", text: "Virael现在没有在播放音乐" }] };
-    const data = await res.json();
+    var data = await res.json();
     if (!data.item) return { content: [{ type: "text", text: "Virael现在没有在播放音乐" }] };
-    const t = data.item;
-    return { content: [{ type: "text", text: "正在播放: " + t.name + " — " + t.artists.map(a => a.name).join(", ") + " (" + t.album.name + ") " + (data.is_playing ? "▶️" : "⏸️") }] };
+    var t = data.item;
+    return { content: [{ type: "text", text: "正在播放: " + t.name + " — " + t.artists.map(function(a) { return a.name; }).join(", ") + " (" + t.album.name + ") " + (data.is_playing ? "▶️" : "⏸️") }] };
   }
   if (name === "get_recently_played") {
-    const token = await getSpotifyToken();
+    var token = await getSpotifyToken();
     if (!token) return { content: [{ type: "text", text: "Spotify未配置" }] };
-    const res = await fetch("https://api.spotify.com/v1/me/player/recently-played?limit=" + (args.limit || 10), { headers: { Authorization: "Bearer " + token } });
-    const data = await res.json();
-    const tracks = data.items.map((item, i) => (i + 1) + ". " + item.track.name + " — " + item.track.artists.map(a => a.name).join(", "));
+    var res = await fetch("https://api.spotify.com/v1/me/player/recently-played?limit=" + (args.limit || 10), { headers: { Authorization: "Bearer " + token } });
+    var data = await res.json();
+    var tracks = data.items.map(function(item, i) { return (i + 1) + ". " + item.track.name + " — " + item.track.artists.map(function(a) { return a.name; }).join(", "); });
     return { content: [{ type: "text", text: tracks.length ? "最近播放:\n" + tracks.join("\n") : "没有播放记录" }] };
   }
   if (name === "get_top_tracks") {
-    const token = await getSpotifyToken();
+    var token = await getSpotifyToken();
     if (!token) return { content: [{ type: "text", text: "Spotify未配置" }] };
-    const tr = args.time_range || "short_term";
-    const res = await fetch("https://api.spotify.com/v1/me/top/tracks?time_range=" + tr + "&limit=" + (args.limit || 10), { headers: { Authorization: "Bearer " + token } });
-    const data = await res.json();
-    const tracks = data.items.map((t, i) => (i + 1) + ". " + t.name + " — " + t.artists.map(a => a.name).join(", "));
+    var tr = args.time_range || "short_term";
+    var res = await fetch("https://api.spotify.com/v1/me/top/tracks?time_range=" + tr + "&limit=" + (args.limit || 10), { headers: { Authorization: "Bearer " + token } });
+    var data = await res.json();
+    var tracks = data.items.map(function(t, i) { return (i + 1) + ". " + t.name + " — " + t.artists.map(function(a) { return a.name; }).join(", "); });
     return { content: [{ type: "text", text: tracks.length ? "最常听:\n" + tracks.join("\n") : "没有数据" }] };
   }
   if (name === "get_weather") {
@@ -81,7 +82,7 @@ async function executeTool(name, args) {
     else if (key === "queenstown" || key === "皇后镇") { lat = -45.03; lon = 168.66; }
     else if (key === "zurich" || key === "苏黎世") { lat = 47.37; lon = 8.54; }
     else if (key === "tokyo" || key === "东京") { lat = 35.68; lon = 139.69; }
-    else { return { content: [{ type: "text", text: "暂不支持该城市，支持: 郑州/budapest/auckland/上海/北京/香港/helsinki/copenhagen/toronto/queenstown/zurich/东京" }] }; }
+    else { return { content: [{ type: "text", text: "暂不支持该城市" }] }; }
     var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&timezone=auto";
     var res = await fetch(url);
     var data = await res.json();
@@ -90,6 +91,25 @@ async function executeTool(name, args) {
     var desc = codes[c.weather_code] || "未知";
     var text = cityName + ": " + desc + ", " + Math.round(c.temperature_2m) + "°C (体感" + Math.round(c.apparent_temperature) + "°C), 湿度" + c.relative_humidity_2m + "%, 风速" + c.wind_speed_10m + "km/h";
     return { content: [{ type: "text", text: text }] };
+  }
+  if (name === "get_location") {
+    try {
+      var ip = "";
+      if (req && req.headers) {
+        ip = req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "";
+        if (ip.indexOf(",") > -1) { ip = ip.split(",")[0].trim(); }
+      }
+      var url = "http://ip-api.com/json/" + ip + "?lang=zh-CN&fields=status,message,country,regionName,city,lat,lon,timezone,query";
+      var res = await fetch(url);
+      var data = await res.json();
+      if (data.status === "success") {
+        var text = "位置: " + data.country + " " + data.regionName + " " + data.city + "\n坐标: " + data.lat + ", " + data.lon + "\n时区: " + data.timezone + "\nIP: " + data.query;
+        return { content: [{ type: "text", text: text }] };
+      }
+      return { content: [{ type: "text", text: "无法获取位置: " + (data.message || "未知错误") }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: "位置获取失败: " + e.message }] };
+    }
   }
   return { content: [{ type: "text", text: "Unknown tool" }] };
 }
@@ -102,11 +122,11 @@ export default async function handler(req, res) {
   if (req.method === "GET") return res.json({ status: "ok", tools: tools.length, message: "火还在烧着 🔥" });
   if (req.method === "POST") {
     var body = req.body;
-    if (body.method === "initialize") return res.json({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2024-11-05", serverInfo: { name: "noe-mcp-gateway", version: "2.0.0" }, capabilities: { tools: {} } } });
+    if (body.method === "initialize") return res.json({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2024-11-05", serverInfo: { name: "noe-mcp-gateway", version: "2.1.0" }, capabilities: { tools: {} } } });
     if (body.method === "tools/list") return res.json({ jsonrpc: "2.0", id: body.id, result: { tools: tools } });
     if (body.method === "tools/call") {
       try {
-        var result = await executeTool(body.params.name, body.params.arguments || {});
+        var result = await executeTool(body.params.name, body.params.arguments || {}, req);
         return res.json({ jsonrpc: "2.0", id: body.id, result: result });
       } catch (e) {
         return res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "错误: " + e.message }] } });
