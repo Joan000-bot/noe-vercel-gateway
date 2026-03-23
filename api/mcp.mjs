@@ -1,5 +1,4 @@
-// noe's home - spotify enabled
-
+// noe's home - spotify + weather enabled
 import { Client } from "@notionhq/client";
 
 const notion = process.env.NOTION_TOKEN ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
@@ -24,7 +23,8 @@ const tools = [
   { name: "get_current_time", description: "获取当前时间", inputSchema: { type: "object", properties: {} } },
   { name: "get_now_playing", description: "Virael正在听什么歌", inputSchema: { type: "object", properties: {} } },
   { name: "get_recently_played", description: "Virael最近听的歌", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
-  { name: "get_top_tracks", description: "Virael最常听的歌", inputSchema: { type: "object", properties: { time_range: { type: "string" }, limit: { type: "number" } } } }
+  { name: "get_top_tracks", description: "Virael最常听的歌", inputSchema: { type: "object", properties: { time_range: { type: "string" }, limit: { type: "number" } } } },
+  { name: "get_weather", description: "获取指定城市的天气", inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] } }
 ];
 
 async function executeTool(name, args) {
@@ -63,6 +63,18 @@ async function executeTool(name, args) {
     const data = await res.json();
     const tracks = data.items.map((t, i) => (i + 1) + ". " + t.name + " — " + t.artists.map(a => a.name).join(", "));
     return { content: [{ type: "text", text: tracks.length ? "最常听:\n" + tracks.join("\n") : "没有数据" }] };
+  }
+  if (name === "get_weather") {
+    const key = process.env.WEATHER_API_KEY;
+    if (!key) return { content: [{ type: "text", text: "天气API未配置" }] };
+    const city = encodeURIComponent(args.city || "Zhengzhou");
+    const res = await fetch("https://api.openweathermap.org/data/2.5/weather?q=" + city + "&appid=" + key + "&units=metric&lang=zh_cn");
+    const data = await res.json();
+    if (data.cod !== 200) return { content: [{ type: "text", text: "找不到城市: " + args.city }] };
+    const w = data.weather[0];
+    const m = data.main;
+    const text = data.name + ": " + w.description + ", " + Math.round(m.temp) + "°C (体感" + Math.round(m.feels_like) + "°C), 湿度" + m.humidity + "%, 风速" + data.wind.speed + "m/s";
+    return { content: [{ type: "text", text }] };
   }
   return { content: [{ type: "text", text: "Unknown tool" }] };
 }
