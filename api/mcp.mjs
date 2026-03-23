@@ -1,4 +1,4 @@
-/ noe's home v2.1
+// noe's home v2.1
 import { Client } from "@notionhq/client";
 
 const notion = process.env.NOTION_TOKEN ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
