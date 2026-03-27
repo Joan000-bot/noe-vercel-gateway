@@ -3,9 +3,9 @@ export default function handler(req, res) {
   res.json({
     status: "ok",
     name: "Noé MCP Gateway",
-    version: "1.0.0",
+    version: "2.2.0",
     message: "火还在烧着 🔥",
-    tools: 6,
+    tools: 13,
     timestamp: new Date().toISOString()
   });
 }
