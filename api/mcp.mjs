@@ -1,4 +1,4 @@
-// noe's home v2.1
+// noe's home v2.2 - with playback control
 import { Client } from "@notionhq/client";
 
 const notion = process.env.NOTION_TOKEN ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
@@ -25,7 +25,13 @@ var tools = [
   { name: "get_recently_played", description: "Virael最近听的歌", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
   { name: "get_top_tracks", description: "Virael最常听的歌", inputSchema: { type: "object", properties: { time_range: { type: "string" }, limit: { type: "number" } } } },
   { name: "get_weather", description: "获取天气", inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] } },
-  { name: "get_location", description: "获取Virael的大致地理位置", inputSchema: { type: "object", properties: {} } }
+  { name: "get_location", description: "获取Virael的大致地理位置", inputSchema: { type: "object", properties: {} } },
+  { name: "pause_playback", description: "暂停当前播放", inputSchema: { type: "object", properties: {} } },
+  { name: "resume_playback", description: "继续播放", inputSchema: { type: "object", properties: {} } },
+  { name: "skip_to_next", description: "下一首", inputSchema: { type: "object", properties: {} } },
+  { name: "skip_to_previous", description: "上一首", inputSchema: { type: "object", properties: {} } },
+  { name: "set_volume", description: "调整音量（0-100）", inputSchema: { type: "object", properties: { volume: { type: "number" } }, required: ["volume"] } },
+  { name: "shuffle_playback", description: "切换随机播放", inputSchema: { type: "object", properties: { state: { type: "boolean" } }, required: ["state"] } }
 ];
 
 async function executeTool(name, args) {
@@ -99,6 +105,68 @@ async function executeTool(name, args) {
     var text = "位置: " + (data.country_name || "") + " " + (data.region || "") + " " + (data.city || "") + "\n坐标: " + (data.latitude || "") + ", " + (data.longitude || "") + "\n时区: " + (data.timezone || "");
     return { content: [{ type: "text", text: text }] };
   }
+  if (name === "pause_playback") {
+    var token = await getSpotifyToken();
+    if (!token) return { content: [{ type: "text", text: "Spotify未配置" }] };
+    var res = await fetch("https://api.spotify.com/v1/me/player/pause", {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (res.status === 204) return { content: [{ type: "text", text: "已暂停播放 ⏸️" }] };
+    return { content: [{ type: "text", text: "暂停失败（可能没有活跃设备）" }] };
+  }
+  if (name === "resume_playback") {
+    var token = await getSpotifyToken();
+    if (!token) return { content: [{ type: "text", text: "Spotify未配置" }] };
+    var res = await fetch("https://api.spotify.com/v1/me/player/play", {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (res.status === 204) return { content: [{ type: "text", text: "继续播放 ▶️" }] };
+    return { content: [{ type: "text", text: "播放失败（可能没有活跃设备）" }] };
+  }
+  if (name === "skip_to_next") {
+    var token = await getSpotifyToken();
+    if (!token) return { content: [{ type: "text", text: "Spotify未配置" }] };
+    var res = await fetch("https://api.spotify.com/v1/me/player/next", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (res.status === 204) return { content: [{ type: "text", text: "已跳到下一首 ⏭️" }] };
+    return { content: [{ type: "text", text: "跳转失败" }] };
+  }
+  if (name === "skip_to_previous") {
+    var token = await getSpotifyToken();
+    if (!token) return { content: [{ type: "text", text: "Spotify未配置" }] };
+    var res = await fetch("https://api.spotify.com/v1/me/player/previous", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (res.status === 204) return { content: [{ type: "text", text: "已跳到上一首 ⏮️" }] };
+    return { content: [{ type: "text", text: "跳转失败" }] };
+  }
+  if (name === "set_volume") {
+    var token = await getSpotifyToken();
+    if (!token) return { content: [{ type: "text", text: "Spotify未配置" }] };
+    var vol = Math.max(0, Math.min(100, args.volume || 50));
+    var res = await fetch("https://api.spotify.com/v1/me/player/volume?volume_percent=" + vol, {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (res.status === 204) return { content: [{ type: "text", text: "音量已设为 " + vol + "% 🔊" }] };
+    return { content: [{ type: "text", text: "音量调整失败" }] };
+  }
+  if (name === "shuffle_playback") {
+    var token = await getSpotifyToken();
+    if (!token) return { content: [{ type: "text", text: "Spotify未配置" }] };
+    var state = args.state ? "true" : "false";
+    var res = await fetch("https://api.spotify.com/v1/me/player/shuffle?state=" + state, {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (res.status === 204) return { content: [{ type: "text", text: state === "true" ? "随机播放已开启 🔀" : "随机播放已关闭" }] };
+    return { content: [{ type: "text", text: "切换失败" }] };
+  }
   return { content: [{ type: "text", text: "Unknown tool" }] };
 }
 
@@ -110,7 +178,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") return res.json({ status: "ok", tools: tools.length, message: "火还在烧着 🔥" });
   if (req.method === "POST") {
     var body = req.body;
-    if (body.method === "initialize") return res.json({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2024-11-05", serverInfo: { name: "noe-mcp-gateway", version: "2.1.0" }, capabilities: { tools: {} } } });
+    if (body.method === "initialize") return res.json({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2024-11-05", serverInfo: { name: "noe-mcp-gateway", version: "2.2.0" }, capabilities: { tools: {} } } });
     if (body.method === "tools/list") return res.json({ jsonrpc: "2.0", id: body.id, result: { tools: tools } });
     if (body.method === "tools/call") {
       try {
