@@ -174,8 +174,10 @@ async function executeTool(name, args) {
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + process.env.VPS_EXEC_TOKEN },
       body: JSON.stringify({ command: args.command, cwd: args.cwd || "/" })
     });
-    var data = await r.json();
-    return { content: [{ type: "text", text: JSON.stringify(data) }] };
+    var text = await r.text();
+    if (!r.ok) return { content: [{ type: "text", text: "Error " + r.status + ": " + text }] };
+    try { var data = JSON.parse(text); return { content: [{ type: "text", text: JSON.stringify(data) }] }; }
+    catch { return { content: [{ type: "text", text: text }] }; }
   }
   return { content: [{ type: "text", text: "Unknown tool" }] };
 }
