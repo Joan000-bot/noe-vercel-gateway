@@ -377,6 +377,51 @@ http.createServer(async function (req, res) {
     return json(res, { ok: true });
   }
 
+  // API: screenshot upload (accepts raw image body OR JSON with base64)
+  if (url.pathname === "/api/screenshot" && req.method === "POST") {
+    var chunks = [];
+    await new Promise(function(resolve) { req.on("data", function(c) { chunks.push(c); }); req.on("end", resolve); });
+    var buf = Buffer.concat(chunks);
+    var filename = "screenshot-" + Date.now() + ".png";
+    fs.mkdirSync(path.join(DATA_DIR, "screenshots"), { recursive: true });
+
+    var contentType = req.headers["content-type"] || "";
+    var note = url.searchParams.get("note") || "screenshot";
+
+    if (contentType.startsWith("image/") || contentType === "application/octet-stream") {
+      // Raw image upload (from Shortcuts)
+      fs.writeFileSync(path.join(DATA_DIR, "screenshots", filename), buf);
+    } else {
+      // JSON with base64
+      try {
+        var parsed = JSON.parse(buf.toString());
+        var base64 = parsed.image || "";
+        if (!base64) return json(res, { error: "No image" }, 400);
+        var imgData = base64.replace(/^data:image\/\w+;base64,/, "");
+        fs.writeFileSync(path.join(DATA_DIR, "screenshots", filename), Buffer.from(imgData, "base64"));
+        note = parsed.note || note;
+      } catch { return json(res, { error: "Bad request" }, 400); }
+    }
+
+    var meta = loadJSON("screenshots");
+    meta.unshift({ filename: filename, time: new Date().toISOString(), note: note });
+    if (meta.length > 50) meta = meta.slice(0, 50);
+    saveJSON("screenshots", meta);
+    return json(res, { ok: true, filename: filename });
+  }
+  if (url.pathname === "/api/screenshot" && req.method === "GET") {
+    return json(res, loadJSON("screenshots").slice(0, 10));
+  }
+  if (url.pathname.startsWith("/api/screenshot/") && req.method === "GET") {
+    var fname = url.pathname.split("/").pop();
+    var fpath = path.join(DATA_DIR, "screenshots", fname);
+    try {
+      var img = fs.readFileSync(fpath);
+      res.writeHead(200, { "Content-Type": "image/png", "Access-Control-Allow-Origin": "*" });
+      return res.end(img);
+    } catch { return json(res, { error: "Not found" }, 404); }
+  }
+
   // API: phone status
   if (url.pathname === "/api/phone" && req.method === "POST") {
     var body = JSON.parse(await readBody(req));

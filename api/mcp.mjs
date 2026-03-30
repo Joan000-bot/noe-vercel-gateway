@@ -33,7 +33,8 @@ var tools = [
   { name: "set_volume", description: "调整音量（0-100）", inputSchema: { type: "object", properties: { volume: { type: "number" } }, required: ["volume"] } },
   { name: "shuffle_playback", description: "切换随机播放", inputSchema: { type: "object", properties: { state: { type: "boolean" } }, required: ["state"] } },
   { name: "exec_vps", description: "在VPS上执行命令", inputSchema: { type: "object", properties: { command: { type: "string", description: "要执行的命令" }, cwd: { type: "string", description: "工作目录" } }, required: ["command"] } },
-  { name: "get_phone_status", description: "查看Virael的手机使用情况（电量、WiFi、正在用的app等）", inputSchema: { type: "object", properties: { limit: { type: "number", description: "返回最近几条记录，默认5" } } } }
+  { name: "get_phone_status", description: "查看Virael的手机使用情况（电量、WiFi、正在用的app等）", inputSchema: { type: "object", properties: { limit: { type: "number", description: "返回最近几条记录，默认5" } } } },
+  { name: "get_screenshots", description: "查看Virael上传的截图列表（如屏幕使用时间截图）", inputSchema: { type: "object", properties: {} } }
 ];
 
 async function executeTool(name, args) {
@@ -195,6 +196,17 @@ async function executeTool(name, args) {
       if (s.location) parts.push("位置: " + s.location);
       return parts.join(" | ");
     }).join("\n");
+    return { content: [{ type: "text", text: text }] };
+  }
+  if (name === "get_screenshots") {
+    var r = await fetch("https://chat.viraelandnoeforever.com/api/screenshot");
+    var data = await r.json();
+    if (!data.length) return { content: [{ type: "text", text: "暂无截图。Virael需要上传截图。" }] };
+    var content = data.map(function(s) {
+      return { type: "image", data: "https://chat.viraelandnoeforever.com/api/screenshot/" + s.filename, mimeType: "image/png" };
+    });
+    // Return text list + image URLs
+    var text = data.map(function(s) { return s.time.slice(0,19).replace("T"," ") + " - " + (s.note||"screenshot") + "\nURL: https://chat.viraelandnoeforever.com/api/screenshot/" + s.filename; }).join("\n\n");
     return { content: [{ type: "text", text: text }] };
   }
   return { content: [{ type: "text", text: "Unknown tool" }] };

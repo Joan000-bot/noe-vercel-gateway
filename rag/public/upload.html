@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Upload Screenshot</title>
+<style>
+body{background:#0a0f1e;color:#d0d8f0;font-family:-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;padding:40px 20px}
+h1{font-size:18px;color:#7eb8ff;margin-bottom:20px}
+.status{margin-top:16px;font-size:14px;text-align:center}
+</style>
+<script>
+// Auto-upload if opened with image data from Shortcuts
+async function upload() {
+  var params = new URLSearchParams(window.location.search);
+  var img = params.get("img");
+  if (img) {
+    document.querySelector(".status").textContent = "Uploading...";
+    var r = await fetch("/api/screenshot", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({image: img, note: params.get("note") || "screen time"})
+    });
+    var d = await r.json();
+    document.querySelector(".status").textContent = d.ok ? "Uploaded!" : "Error";
+  }
+}
+window.onload = upload;
+</script>
+</head>
+<body>
+<h1>Screenshot Upload</h1>
+<div class="status">Waiting for image...</div>
+</body>
+</html>
