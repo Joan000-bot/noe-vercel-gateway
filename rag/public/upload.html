@@ -3,33 +3,50 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Upload Screenshot</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Upload to Noe</title>
 <style>
 body{background:#0a0f1e;color:#d0d8f0;font-family:-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;padding:40px 20px}
-h1{font-size:18px;color:#7eb8ff;margin-bottom:20px}
-.status{margin-top:16px;font-size:14px;text-align:center}
+h1{font-size:20px;color:#7eb8ff;margin-bottom:20px}
+label{display:block;width:100%;max-width:320px;padding:40px 20px;background:rgba(255,255,255,0.05);border:2px dashed rgba(70,90,150,0.4);border-radius:16px;text-align:center;color:rgba(150,170,220,0.6);font-size:16px;cursor:pointer;margin-bottom:16px}
+label:active{background:rgba(126,184,255,0.1)}
+img{max-width:300px;border-radius:12px;margin-bottom:12px;display:none}
+.status{margin-top:12px;font-size:14px;text-align:center;min-height:20px}
+.hidden{display:none}
 </style>
-<script>
-// Auto-upload if opened with image data from Shortcuts
-async function upload() {
-  var params = new URLSearchParams(window.location.search);
-  var img = params.get("img");
-  if (img) {
-    document.querySelector(".status").textContent = "Uploading...";
-    var r = await fetch("/api/screenshot", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({image: img, note: params.get("note") || "screen time"})
-    });
-    var d = await r.json();
-    document.querySelector(".status").textContent = d.ok ? "Uploaded!" : "Error";
-  }
-}
-window.onload = upload;
-</script>
 </head>
 <body>
-<h1>Screenshot Upload</h1>
-<div class="status">Waiting for image...</div>
+<h1>Upload to Noe</h1>
+<label for="fileInput">Tap to select screenshot from Photos</label>
+<input type="file" id="fileInput" class="hidden" accept="image/*" onchange="preview(this)">
+<img id="previewImg">
+<div class="status" id="status"></div>
+
+<script>
+function preview(inp) {
+  var f = inp.files[0];
+  if (!f) return;
+  var img = document.getElementById("previewImg");
+  img.src = URL.createObjectURL(f);
+  img.style.display = "block";
+  document.getElementById("status").textContent = "Uploading...";
+
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      var r = await fetch("/api/screenshot", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({image: e.target.result, note: "screen time"})
+      });
+      var d = await r.json();
+      document.getElementById("status").textContent = d.ok ? "Uploaded! Noe can see it now." : "Error: " + JSON.stringify(d);
+    } catch(err) {
+      document.getElementById("status").textContent = "Error: " + err.message;
+    }
+  };
+  reader.readAsDataURL(f);
+}
+</script>
 </body>
 </html>
