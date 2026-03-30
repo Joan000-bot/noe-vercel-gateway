@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Noe</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Noto+Serif+SC:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0f1e;--surface:rgba(12,18,40,0.95);--surface2:rgba(18,26,55,0.8);--border:rgba(60,80,140,0.3);
+  --text:#d8dce8;--text2:rgba(160,175,220,0.6);--accent:#7eb8ff;--accent2:#5a9ae6;
+  --bubble-user:rgba(90,154,230,0.25);--bubble-ai:rgba(20,30,60,0.6);
+  --font-display:'Playfair Display','Noto Serif SC',serif;--font-body:'Cormorant Garamond','Noto Serif SC',serif;
+}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);height:100vh;display:flex;font-size:15px;overflow:hidden}
+
+/* === STARRY SKY === */
+.stars-bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.stars-bg canvas{width:100%;height:100%}
+
+/* === SIDEBAR === */
+.sidebar-toggle{position:fixed;top:12px;left:12px;z-index:50;width:36px;height:36px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px)}
+.sidebar-toggle:hover{border-color:var(--accent);color:var(--accent)}
+.sidebar{width:300px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;z-index:40;backdrop-filter:blur(20px);transition:margin-left .3s,opacity .3s}
+.sidebar.collapsed{margin-left:-300px;opacity:0;pointer-events:none}
+.sidebar::-webkit-scrollbar{width:3px}.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.ss{padding:12px 14px;border-bottom:1px solid var(--border)}
+.ss h2{font-family:var(--font-display);font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:400}
+select,.ss input[type="text"],.ss input[type="url"]{width:100%;padding:6px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-family:var(--font-body);outline:none}
+select:focus,.ss input:focus{border-color:var(--accent)}
+.slider-wrap{margin-top:6px}
+.slider-wrap label{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:3px}
+.slider-wrap label span{color:var(--accent)}
+input[type="range"]{width:100%;-webkit-appearance:none;height:2px;background:var(--border);border-radius:1px;outline:none}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:var(--accent);border-radius:50%;cursor:pointer}
+.color-row{display:flex;gap:6px;align-items:center;margin-top:5px}
+.color-row label{font-size:10px;color:var(--text2);width:55px;flex-shrink:0}
+.color-row input[type="color"]{width:24px;height:24px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;padding:0}
+.bg-input{display:flex;gap:4px;margin-top:5px;align-items:center}
+.bg-input input[type="text"]{flex:1;font-size:11px}
+.bg-input button,.bg-input label{padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:10px;cursor:pointer;white-space:nowrap}
+.voice-row{display:flex;gap:5px;align-items:center;margin-top:5px}
+.voice-row select{flex:1;font-size:11px}
+.icon-btn{padding:6px 9px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:14px;cursor:pointer;transition:all .2s;flex-shrink:0}
+.icon-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(126,184,255,0.1)}
+.auto-row{display:flex;gap:5px;align-items:center}
+.auto-row input{flex:1;font-size:11px}
+.auto-row select{width:55px;font-size:11px}
+.auto-btn{width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-size:11px;cursor:pointer;margin-top:5px;font-family:var(--font-body)}
+.auto-btn.running{border-color:#f66;color:#f66}
+.auto-status{font-size:10px;color:var(--text2);margin-top:3px}
+.doc-list{max-height:120px;overflow-y:auto}
+.doc-item{display:flex;align-items:center;padding:5px 8px;background:rgba(255,255,255,0.03);border-radius:6px;margin-bottom:3px;font-size:11px}
+.doc-item .source{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)}
+.doc-item .chunks{color:var(--accent);font-size:10px;margin:0 5px}
+.doc-item .del{background:none;border:none;color:#666;cursor:pointer;font-size:13px}
+.doc-btns{display:flex;gap:5px;margin-top:5px}
+.doc-btns button{flex:1;padding:6px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;cursor:pointer;font-family:var(--font-body)}
+.hidden{display:none}
+
+/* === CHAT === */
+.chat-area{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-index:1}
+.chat-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.12;pointer-events:none;z-index:0}
+.chat-header{padding:10px 24px 10px 56px;border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:1;position:relative;backdrop-filter:blur(10px)}
+.chat-header .logo{font-family:var(--font-display);font-size:28px;font-weight:700;color:var(--accent);font-style:italic;letter-spacing:3px;text-shadow:0 0 20px rgba(126,184,255,0.3)}
+
+/* Header right */
+.header-right{position:absolute;right:16px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px}
+.mini-vinyl-wrap{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 10px;border-radius:20px;transition:background .2s}
+.mini-vinyl-wrap:hover{background:rgba(255,255,255,0.05)}
+.mini-vinyl{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle,#222 35%,#111 36%,#222 55%,#111 56%,#222 75%,#1a1a1a 100%);box-shadow:0 0 8px rgba(0,0,0,0.4);position:relative;flex-shrink:0}
+.mini-vinyl.spinning{animation:spin 3s linear infinite}
+.mini-vinyl-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:var(--accent2);border:1.5px solid #444}
+.np{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--accent)}
+.gear-btn{background:none;border:1px solid var(--border);border-radius:50%;width:32px;height:32px;color:var(--text2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.gear-btn:hover{border-color:var(--accent);color:var(--accent);transform:rotate(45deg)}
+
+/* Messages */
+.messages{flex:1;overflow-y:auto;padding:20px;z-index:1;position:relative}
+.messages::-webkit-scrollbar{width:3px}.messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.message{max-width:720px;margin:0 auto 16px;display:flex;gap:8px}
+.message.user{justify-content:flex-end}
+.avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;object-fit:cover;cursor:pointer;background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:12px;overflow:hidden;border:1px solid var(--border)}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.msg-content{display:flex;flex-direction:column;max-width:85%}
+.message.user .msg-content{align-items:flex-end}
+.message.assistant .msg-content{align-items:flex-start}
+.bubble{padding:10px 16px;line-height:1.7;font-family:var(--font-body);font-size:15px;backdrop-filter:blur(8px)}
+.message.user .bubble{background:var(--bubble-user);color:#e0eaff;border-radius:16px 16px 4px 16px;border:1px solid rgba(126,184,255,0.15)}
+.message.assistant .bubble{background:var(--bubble-ai);border-radius:16px 16px 16px 4px;border:1px solid rgba(60,80,140,0.2)}
+.thinking-block{background:rgba(40,40,20,0.5);border:1px solid rgba(80,80,40,0.3);border-radius:10px;padding:8px 12px;margin-bottom:5px;font-size:11px;color:#b0a870;line-height:1.5;max-height:160px;overflow-y:auto;cursor:pointer;position:relative}
+.thinking-block.collapsed{max-height:32px;overflow:hidden}
+.thinking-block::before{content:"thinking";font-size:8px;text-transform:uppercase;letter-spacing:2px;color:#8a8050;display:block;margin-bottom:2px;font-family:var(--font-display)}
+.thinking-block.collapsed::after{content:"";position:absolute;bottom:0;left:0;right:0;height:14px;background:linear-gradient(transparent,rgba(40,40,20,0.5))}
+.sources{font-size:10px;color:var(--text2);margin-top:5px;padding:5px 10px;background:rgba(10,15,30,0.5);border-radius:6px}
+.sources span{color:var(--accent)}
+.msg-actions{display:flex;gap:6px;margin-top:4px}
+.msg-actions button{background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:10px;color:var(--text2);cursor:pointer;font-family:var(--font-body)}
+.msg-actions button:hover,.msg-actions button.active{border-color:var(--accent);color:var(--accent)}
+/* Voice message bubble */
+.voice-msg{display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(126,184,255,0.1);border:1px solid rgba(126,184,255,0.15);border-radius:16px;cursor:pointer;min-width:120px}
+.voice-msg .wave{flex:1;height:20px;display:flex;align-items:center;gap:2px}
+.voice-msg .wave span{display:inline-block;width:3px;background:var(--accent);border-radius:1px;animation:waveAnim .6s ease-in-out infinite alternate}
+.voice-msg .wave span:nth-child(2){animation-delay:.1s}.voice-msg .wave span:nth-child(3){animation-delay:.2s}.voice-msg .wave span:nth-child(4){animation-delay:.3s}.voice-msg .wave span:nth-child(5){animation-delay:.4s}
+@keyframes waveAnim{0%{height:4px}100%{height:16px}}
+.voice-msg .dur{font-size:11px;color:var(--text2)}
+.voice-msg.playing .wave span{background:#fff}
+
+/* Input */
+.input-area{padding:12px 20px;border-top:1px solid var(--border);z-index:1;position:relative;backdrop-filter:blur(10px)}
+.input-wrap{max-width:720px;margin:0 auto;display:flex;gap:8px;align-items:flex-end}
+.input-wrap textarea{flex:1;padding:10px 14px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:14px;font-family:var(--font-body);resize:none;outline:none;height:44px;max-height:120px}
+.input-wrap textarea:focus{border-color:var(--accent)}
+.input-wrap .send-btn{padding:0 16px;height:44px;background:var(--accent2);border:none;border-radius:12px;color:#fff;font-size:13px;cursor:pointer;font-family:var(--font-display);letter-spacing:1px}
+.input-wrap .send-btn:disabled{opacity:.3}
+.mic-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.mic-btn.recording{background:rgba(255,60,60,0.2);border-color:#f66;color:#f66;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,60,60,0.3)}50%{box-shadow:0 0 0 10px rgba(255,60,60,0)}}
+
+/* === MUSIC PLAYER OVERLAY === */
+.music-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(5,8,18,0.97);flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(30px)}
+.music-overlay.active{display:flex}
+.music-close{position:absolute;top:16px;right:20px;background:none;border:none;color:var(--text2);font-size:28px;cursor:pointer}
+.music-close:hover{color:var(--text)}
+.vinyl-wrap{position:relative;width:280px;height:280px;margin-bottom:30px}
+.vinyl{width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,#1a1a1a 30%,#0a0a0a 31%,#1a1a1a 32%,#0a0a0a 50%,#1a1a1a 51%,#0a0a0a 52%,#1a1a1a 70%,#0a0a0a 71%,#1a1a1a 72%,#111 100%);box-shadow:0 0 40px rgba(0,0,0,0.5),inset 0 0 60px rgba(0,0,0,0.3);position:relative;display:flex;align-items:center;justify-content:center}
+.vinyl.spinning{animation:spin 3s linear infinite}
+@keyframes spin{100%{transform:rotate(360deg)}}
+.vinyl-art{width:110px;height:110px;border-radius:50%;background:var(--accent2);overflow:hidden;border:3px solid #333;display:flex;align-items:center;justify-content:center;font-size:36px;color:rgba(255,255,255,0.3)}
+.vinyl-art img{width:100%;height:100%;object-fit:cover}
+.vinyl-hole{position:absolute;width:12px;height:12px;border-radius:50%;background:#0a0a0a;border:2px solid #333;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2}
+.needle{position:absolute;top:-10px;right:50px;width:8px;height:120px;background:linear-gradient(#888,#555);border-radius:4px;transform-origin:top center;transform:rotate(-25deg);transition:transform .5s;z-index:3}
+.needle.down{transform:rotate(-5deg)}
+.needle::before{content:"";position:absolute;top:-8px;left:-6px;width:20px;height:20px;border-radius:50%;background:#666;border:2px solid #888}
+.needle::after{content:"";position:absolute;bottom:-2px;left:1px;width:6px;height:6px;background:#aaa;border-radius:0 0 3px 3px}
+.music-info{text-align:center;margin-bottom:24px;max-width:300px}
+.music-title{font-family:var(--font-display);font-size:20px;font-weight:400;margin-bottom:4px;color:var(--text)}
+.music-sub{font-size:13px;color:var(--text2)}
+.music-controls{display:flex;align-items:center;gap:20px;margin-bottom:20px}
+.music-controls button{background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;transition:color .2s;padding:8px}
+.music-controls button:hover{color:var(--accent)}
+.music-controls .play-btn{width:56px;height:56px;border-radius:50%;background:var(--accent2);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;border:none}
+.music-controls .play-btn:hover{background:var(--accent)}
+.heart-btn{font-size:22px;cursor:pointer;background:none;border:none;color:var(--text2);transition:all .2s}
+.heart-btn.liked{color:#f44;text-shadow:0 0 10px rgba(255,68,68,0.4)}
+.listen-timer{font-size:12px;color:var(--text2);margin-top:12px;font-family:var(--font-display);letter-spacing:1px}
+.playlist-panel{width:300px;max-height:200px;overflow-y:auto;margin-top:16px}
+.playlist-panel::-webkit-scrollbar{width:3px}.playlist-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.pl-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .2s}
+.pl-item:hover,.pl-item.active{background:rgba(126,184,255,0.1);color:var(--text)}
+.pl-item .pl-num{width:20px;text-align:center;font-size:11px;color:var(--text2)}
+.pl-item.active .pl-num{color:var(--accent)}
+.pl-item .pl-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-item .pl-del{background:none;border:none;color:transparent;cursor:pointer;font-size:12px;transition:color .2s}
+.pl-item:hover .pl-del{color:#666}
+.pl-item .pl-del:hover{color:#f66}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(5,8,18,0.8);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(5px)}
+.modal-overlay.active{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;width:380px;max-width:90vw;backdrop-filter:blur(20px)}
+.modal h3{margin-bottom:12px;font-family:var(--font-display);font-weight:400;font-size:17px}
+.modal input,.modal textarea{width:100%;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-family:var(--font-body);outline:none;margin-bottom:8px}
+.modal textarea{height:140px;resize:vertical}
+.modal-btns{display:flex;gap:6px;justify-content:flex-end}
+.modal-btns button{padding:7px 18px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);cursor:pointer;font-family:var(--font-body);font-size:13px}
+.modal-btns .primary{background:var(--accent2);border-color:var(--accent2);color:#fff}
+.bubble code{background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;font-size:11px;font-family:monospace}
+.bubble pre{background:rgba(0,0,0,0.3);padding:8px;border-radius:8px;overflow-x:auto;margin:5px 0}
+.bubble pre code{background:none;padding:0}
+
+@media(max-width:768px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:40}
+  .sidebar.collapsed{margin-left:-300px}
+  .sidebar-toggle{width:32px;height:32px;font-size:15px;top:10px;left:10px;z-index:50}
+  .sidebar-toggle.inside{left:256px;top:6px}
+  .vinyl-wrap{width:220px;height:220px}
+  .vinyl{width:220px;height:220px}
+  .vinyl-art{width:85px;height:85px}
+}
+</style>
+</head>
+<body>
+
+<!-- STARRY SKY -->
+<div class="stars-bg"><canvas id="starsCanvas"></canvas></div>
+
+<!-- SIDEBAR -->
+<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">&#9776;</button>
+<div class="sidebar collapsed" id="sidebar">
+  <div class="ss">
+    <h2>Model</h2>
+    <select id="modelSelect"></select>
+  </div>
+  <div class="ss">
+    <h2>Theme</h2>
+    <div class="color-row"><label>Accent</label><input type="color" id="themeAccent" value="#7eb8ff" onchange="applyTheme()"></div>
+    <div class="color-row"><label>Bubble</label><input type="range" id="bubbleAlpha" min="0" max="100" value="25" oninput="applyTheme()"><span style="font-size:10px;color:var(--text2)" id="alphaLabel">25%</span></div>
+    <div class="bg-input"><input type="text" id="chatBgUrl" placeholder="Background URL..."><button onclick="applyTheme()">Set</button><label for="chatBgFile">Upload</label><input type="file" id="chatBgFile" class="hidden" accept="image/*" onchange="uploadChatBg(this)"></div>
+    <div class="bg-input" style="margin-top:3px"><button onclick="clearChatBg()" style="flex:1">Clear BG</button></div>
+  </div>
+  <div class="ss">
+    <h2>Avatars</h2>
+    <div style="display:flex;gap:12px;align-items:center">
+      <div style="text-align:center"><div class="avatar" id="noeAP" onclick="document.getElementById('noeAI').click()">N</div><div style="font-size:9px;color:var(--text2);margin-top:1px">Noe</div></div>
+      <div style="text-align:center"><div class="avatar" id="viAP" onclick="document.getElementById('viAI').click()">V</div><div style="font-size:9px;color:var(--text2);margin-top:1px">Virael</div></div>
+    </div>
+    <input type="file" id="noeAI" class="hidden" accept="image/*" onchange="setAvatar('noe',this)">
+    <input type="file" id="viAI" class="hidden" accept="image/*" onchange="setAvatar('vi',this)">
+  </div>
+  <div class="ss">
+    <h2>Voice</h2>
+    <div class="voice-row"><select id="voiceSelect"><option value="">Loading...</option></select><button class="icon-btn" id="voiceToggle" onclick="toggleVoice()" title="Auto-read">&#9834;</button></div>
+  </div>
+  <div class="ss" style="flex:1;display:flex;flex-direction:column;min-height:0">
+    <h2>Knowledge Base</h2>
+    <div class="doc-list" id="docList"></div>
+    <div class="doc-btns"><button onclick="showModal('text')">+ Text</button><button onclick="showModal('url')">+ URL</button></div>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div class="chat-area">
+  <div class="chat-bg" id="chatBg"></div>
+  <div class="chat-header">
+    <div class="logo">Noe</div>
+    <div class="header-right">
+      <div class="mini-vinyl-wrap" onclick="openMusicPlayer()" title="Listen Together">
+        <div class="mini-vinyl" id="miniVinyl"><div class="mini-vinyl-center"></div></div>
+        <span class="np" id="mcText"></span>
+      </div>
+      <button class="gear-btn" onclick="openSettings()" title="Settings">&#9881;</button>
+    </div>
+  </div>
+  <div class="messages" id="messages"></div>
+  <div class="input-area">
+    <div class="input-wrap">
+      <button class="mic-btn" id="micBtn" onclick="toggleRecording()" title="Voice message">&#127908;</button>
+      <textarea id="input" placeholder="Say something..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="send()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- MUSIC PLAYER -->
+<div class="music-overlay" id="musicOverlay">
+  <button class="music-close" onclick="closeMusicPlayer()">&times;</button>
+  <div class="vinyl-wrap">
+    <div class="needle" id="needle"></div>
+    <div class="vinyl" id="vinyl">
+      <div class="vinyl-art" id="vinylArt">&#9835;</div>
+      <div class="vinyl-hole"></div>
+    </div>
+  </div>
+  <div class="music-info">
+    <div class="music-title" id="mTitle">No song playing</div>
+    <div class="music-sub" id="mSub">Add a song to start</div>
+  </div>
+  <div class="music-controls">
+    <button onclick="playPrev()">&#9198;</button>
+    <button class="play-btn" id="playBtn" onclick="togglePlay()">&#9654;</button>
+    <button onclick="playNextTrack()">&#9197;</button>
+  </div>
+  <button class="heart-btn" id="heartBtn" onclick="toggleHeart()">&#9825;</button>
+  <div class="listen-timer" id="listenTimer">Listening together for 0:00</div>
+  <div style="margin-top:14px;display:flex;gap:6px;width:300px">
+    <input type="url" id="musicUrl" placeholder="Paste music URL..." style="flex:1;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-family:var(--font-body);outline:none">
+    <button onclick="addMusic()" style="padding:8px 14px;background:var(--accent2);border:none;border-radius:8px;color:#fff;font-size:12px;cursor:pointer">+</button>
+  </div>
+  <div class="playlist-panel" id="plPanel"></div>
+</div>
+<audio id="musicPlayer" onended="playNextTrack()" onplay="onMusicPlay()" onpause="onMusicPause()"></audio>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="textModal"><div class="modal"><h3>Add Text</h3><input id="textSource" placeholder="Name"><textarea id="textContent" placeholder="Paste text..."></textarea><div class="modal-btns"><button onclick="closeModals()">Cancel</button><button class="primary" onclick="addText()">Add</button></div></div></div>
+<div class="modal-overlay" id="urlModal"><div class="modal"><h3>Add URL</h3><input id="urlInput" placeholder="https://..."><div class="modal-btns"><button onclick="closeModals()">Cancel</button><button class="primary" onclick="addUrl()">Fetch</button></div></div></div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="width:440px">
+    <h3>Settings</h3>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">System Prompt</div>
+    <textarea id="systemPrompt" placeholder="Define Noe's personality, behavior, context..." style="height:120px"></textarea>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Model</div>
+    <select id="settingsModel" style="margin-bottom:10px"></select>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Temperature</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <input type="range" id="tempSlider" min="0" max="100" value="70" style="flex:1">
+      <span style="font-size:11px;color:var(--accent)" id="tempLabel">0.7</span>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Thinking Budget</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <input type="range" id="thinkingSlider" min="0" max="32000" step="1000" value="0" style="flex:1" oninput="updateThinkingLabel()">
+      <span style="font-size:11px;color:var(--accent)" id="thinkingLabel">Off</span>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Auto Message</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input type="text" id="autoMsg" placeholder="Message to auto-send..." style="flex:1;margin-bottom:0">
+      <select id="autoInterval" style="width:65px;margin-bottom:0"><option value="30">30s</option><option value="60" selected>1m</option><option value="300">5m</option><option value="600">10m</option><option value="3600">1h</option></select>
+    </div>
+    <button class="auto-btn" id="autoBtn" onclick="toggleAuto()" style="margin-bottom:10px">Start Auto</button>
+    <div class="auto-status" id="autoStatus"></div>
+    <div class="modal-btns">
+      <button onclick="closeModals()">Cancel</button>
+      <button class="primary" onclick="savePromptSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var API=window.location.origin,chatHistory=[],sending=false,autoTimer=null,voiceEnabled=false,currentAudio=null;
+var noeAvatar=null,viAvatar=null,playlist=[],playIndex=-1,liked={},listenStart=null,listenInterval=null;
+
+// === STARS ===
+(function(){
+  var c=document.getElementById("starsCanvas"),ctx=c.getContext("2d"),stars=[],shooters=[];
+  function resize(){c.width=window.innerWidth;c.height=window.innerHeight}
+  resize();window.addEventListener("resize",resize);
+  for(var i=0;i<200;i++)stars.push({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.5+0.3,a:Math.random(),da:Math.random()*0.02-0.01,drift:Math.random()*0.1-0.05});
+  function addShooter(){if(Math.random()<0.005)shooters.push({x:Math.random()*c.width,y:0,vx:Math.random()*3-1.5,vy:Math.random()*4+2,life:60})}
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    // Nebula
+    var g=ctx.createRadialGradient(c.width*0.3,c.height*0.4,0,c.width*0.3,c.height*0.4,c.width*0.5);
+    g.addColorStop(0,"rgba(30,50,120,0.08)");g.addColorStop(0.5,"rgba(60,30,100,0.04)");g.addColorStop(1,"transparent");
+    ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);
+    // Stars
+    for(var s of stars){
+      s.a+=s.da;if(s.a>1||s.a<0.2)s.da*=-1;
+      s.x+=s.drift;if(s.x<0)s.x=c.width;if(s.x>c.width)s.x=0;
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle="rgba(200,220,255,"+s.a+")";ctx.fill();
+    }
+    // Shooters
+    addShooter();
+    for(var i=shooters.length-1;i>=0;i--){
+      var sh=shooters[i];sh.x+=sh.vx;sh.y+=sh.vy;sh.life--;
+      if(sh.life<=0){shooters.splice(i,1);continue}
+      ctx.beginPath();ctx.moveTo(sh.x,sh.y);ctx.lineTo(sh.x-sh.vx*3,sh.y-sh.vy*3);
+      ctx.strokeStyle="rgba(200,220,255,"+(sh.life/60)+")";ctx.lineWidth=1.5;ctx.stroke();
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// === INIT ===
+async function init(){
+  loadSettings();
+  var r=await fetch(API+"/api/models");var models=await r.json();
+  var sel=document.getElementById("modelSelect");sel.innerHTML="";
+  models.forEach(function(m){var o=document.createElement("option");o.value=m.id;o.textContent=m.name;sel.appendChild(o)});
+  loadDocs();loadVoices();loadPlaylistUI();
+}
+
+// === SETTINGS ===
+var customPrompt="",customTemp=0.7;
+function saveSettings(){localStorage.setItem("noe-s",JSON.stringify({accent:document.getElementById("themeAccent").value,alpha:document.getElementById("bubbleAlpha").value,chatBg:document.getElementById("chatBgUrl").value,na:noeAvatar,va:viAvatar,liked:liked,prompt:customPrompt,temp:customTemp}))}
+function loadSettings(){try{var s=JSON.parse(localStorage.getItem("noe-s"));if(!s)return;if(s.accent)document.getElementById("themeAccent").value=s.accent;if(s.alpha)document.getElementById("bubbleAlpha").value=s.alpha;if(s.chatBg)document.getElementById("chatBgUrl").value=s.chatBg;if(s.na){noeAvatar=s.na;document.getElementById("noeAP").innerHTML='<img src="'+s.na+'">'};if(s.va){viAvatar=s.va;document.getElementById("viAP").innerHTML='<img src="'+s.va+'">'};if(s.liked)liked=s.liked;if(s.prompt)customPrompt=s.prompt;if(s.temp)customTemp=s.temp;applyTheme()}catch{}}
+function openSettings(){
+  document.getElementById("systemPrompt").value=customPrompt;
+  document.getElementById("tempSlider").value=Math.round(customTemp*100);
+  document.getElementById("tempLabel").textContent=customTemp;
+  document.getElementById("tempSlider").oninput=function(){document.getElementById("tempLabel").textContent=(this.value/100).toFixed(1)};
+  // Sync model select
+  var sel=document.getElementById("settingsModel");sel.innerHTML=document.getElementById("modelSelect").innerHTML;sel.value=document.getElementById("modelSelect").value;
+  document.getElementById("settingsModal").classList.add("active");
+}
+function savePromptSettings(){
+  customPrompt=document.getElementById("systemPrompt").value;
+  customTemp=parseInt(document.getElementById("tempSlider").value)/100;
+  document.getElementById("modelSelect").value=document.getElementById("settingsModel").value;
+  saveSettings();closeModals();
+}
+function applyTheme(){var a=document.getElementById("themeAccent").value,al=parseInt(document.getElementById("bubbleAlpha").value)/100,bg=document.getElementById("chatBgUrl").value;
+  document.getElementById("alphaLabel").textContent=Math.round(al*100)+"%";
+  var rgb=hexToRgb(a);document.documentElement.style.setProperty("--accent",a);document.documentElement.style.setProperty("--accent2",a);document.documentElement.style.setProperty("--bubble-user","rgba("+rgb+","+al+")");
+  var bgEl=document.getElementById("chatBg");bgEl.style.backgroundImage=bg?'url('+bg+')':'none';saveSettings()}
+function hexToRgb(h){return parseInt(h.slice(1,3),16)+","+parseInt(h.slice(3,5),16)+","+parseInt(h.slice(5,7),16)}
+function uploadChatBg(i){var f=i.files[0];if(!f)return;var r=new FileReader();r.onload=function(e){document.getElementById("chatBgUrl").value=e.target.result;applyTheme()};r.readAsDataURL(f)}
+function clearChatBg(){document.getElementById("chatBgUrl").value="";applyTheme()}
+function toggleSidebar(){var s=document.getElementById("sidebar"),b=document.getElementById("sidebarToggle");s.classList.toggle("collapsed");var open=!s.classList.contains("collapsed");b.innerHTML=open?"&#10005;":"&#9776;";b.classList.toggle("inside",open&&window.innerWidth<=768)}
+function setAvatar(w,i){var f=i.files[0];if(!f)return;var r=new FileReader();r.onload=function(e){if(w==="noe"){noeAvatar=e.target.result;document.getElementById("noeAP").innerHTML='<img src="'+e.target.result+'">'}else{viAvatar=e.target.result;document.getElementById("viAP").innerHTML='<img src="'+e.target.result+'">'}saveSettings()};r.readAsDataURL(f)}
+function makeAvatar(w){var d=document.createElement("div");d.className="avatar";var s=w==="noe"?noeAvatar:viAvatar;if(s)d.innerHTML='<img src="'+s+'">';else d.textContent=w==="noe"?"N":"V";return d}
+function updateThinkingLabel(){var v=parseInt(document.getElementById("thinkingSlider").value);document.getElementById("thinkingLabel").textContent=v===0?"Off":v<1000?v+"":Math.round(v/1000)+"k"}
+
+// === VOICE (TTS + STT) ===
+async function loadVoices(){try{var r=await fetch(API+"/api/voices");var v=await r.json();var s=document.getElementById("voiceSelect");s.innerHTML="";v.forEach(function(x){var o=document.createElement("option");o.value=x.id;o.textContent=x.name;s.appendChild(o)})}catch{}}
+function toggleVoice(){voiceEnabled=!voiceEnabled;document.getElementById("voiceToggle").classList.toggle("active",voiceEnabled)}
+async function playTTS(text,btn){if(currentAudio){currentAudio.pause();currentAudio=null}if(btn)btn.classList.add("active");
+  try{var r=await fetch(API+"/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:text.slice(0,5000),voice:document.getElementById("voiceSelect").value})});var b=await r.blob();currentAudio=new Audio(URL.createObjectURL(b));currentAudio.onended=function(){if(btn)btn.classList.remove("active");currentAudio=null};currentAudio.play()}catch{if(btn)btn.classList.remove("active")}}
+
+// --- VOICE RECORDING (STT) ---
+var mediaRec=null,audioChunks=[];
+function toggleRecording(){
+  if(mediaRec&&mediaRec.state==="recording"){mediaRec.stop();return}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    audioChunks=[];mediaRec=new MediaRecorder(stream);
+    mediaRec.ondataavailable=function(e){audioChunks.push(e.data)};
+    mediaRec.onstop=function(){
+      stream.getTracks().forEach(function(t){t.stop()});
+      var blob=new Blob(audioChunks,{type:"audio/webm"});
+      sendVoiceMessage(blob);
+      document.getElementById("micBtn").classList.remove("recording");
+    };
+    mediaRec.start();document.getElementById("micBtn").classList.add("recording");
+  }).catch(function(){alert("Microphone access denied")});
+}
+function sendVoiceMessage(blob){
+  var url=URL.createObjectURL(blob);
+  // Add user voice bubble
+  var div=document.createElement("div");div.className="message user";
+  var mc=document.createElement("div");mc.className="msg-content";
+  var vm=document.createElement("div");vm.className="voice-msg";
+  vm.innerHTML='<span style="font-size:14px">&#127908;</span><div class="wave"><span></span><span></span><span></span><span></span><span></span></div><span class="dur">Voice</span>';
+  vm.onclick=function(){var a=new Audio(url);a.play()};
+  mc.appendChild(vm);div.appendChild(mc);div.appendChild(makeAvatar("vi"));
+  document.getElementById("messages").appendChild(div);
+  document.getElementById("messages").scrollTop=999999;
+  // Use browser STT to transcribe then send as text
+  if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
+    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    // Fallback: just send a note
+  }
+  // For now, play the audio back through and also send to chat as "[Voice message]"
+  chatHistory.push({role:"user",content:"[User sent a voice message]"});
+  // Auto-trigger AI response
+  sendChatMessage("[The user just sent you a voice message. Please respond warmly.]");
+}
+function sendChatMessage(msg){
+  sending=true;document.getElementById("sendBtn").disabled=true;
+  var msgDiv=addAssistantMsg();var mc=msgDiv.querySelector(".msg-content");var bubble=msgDiv.querySelector(".bubble");
+  var thinkingBlock=null,fullText="",thinkingText="",sources=[];
+  fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg,model:document.getElementById("modelSelect").value,history:chatHistory.slice(-20),thinking_budget:parseInt(document.getElementById("thinkingSlider").value),system_prompt:customPrompt,temperature:customTemp})}).then(function(r){
+    var reader=r.body.getReader(),decoder=new TextDecoder(),buf="";
+    function read(){reader.read().then(function(res){
+      if(res.done){finish();return}
+      buf+=decoder.decode(res.value,{stream:true});var lines=buf.split("\n");buf=lines.pop();
+      for(var line of lines){if(!line.startsWith("data: "))continue;var d=line.slice(6);if(d==="[DONE]")break;
+        try{var p=JSON.parse(d);if(p.sources){sources=p.sources;continue}if(p.thinking){if(!thinkingBlock){thinkingBlock=document.createElement("div");thinkingBlock.className="thinking-block";thinkingBlock.onclick=function(){this.classList.toggle("collapsed")};mc.insertBefore(thinkingBlock,bubble)}thinkingText+=p.thinking;thinkingBlock.innerHTML="<span></span>"+renderMD(thinkingText)}if(p.content){fullText+=p.content;bubble.innerHTML=renderMD(fullText)}document.getElementById("messages").scrollTop=999999}catch{}}
+      read()})};read()}).catch(function(e){bubble.innerHTML='<span style="color:#f66">'+e.message+'</span>';finish()});
+  function finish(){
+    if(thinkingBlock)thinkingBlock.classList.add("collapsed");
+    if(sources.length){var s=document.createElement("div");s.className="sources";s.innerHTML="Ref: "+sources.map(function(x){return'<span>'+x+'</span>'}).join(", ");mc.appendChild(s)}
+    if(fullText){
+      var acts=document.createElement("div");acts.className="msg-actions";
+      var vb=document.createElement("button");vb.textContent="&#9835; Play";vb.innerHTML="&#9835; Play";vb.onclick=function(){playTTS(fullText,vb)};acts.appendChild(vb);mc.appendChild(acts);
+      if(voiceEnabled)playTTS(fullText);
+    }
+    chatHistory.push({role:"assistant",content:fullText});sending=false;document.getElementById("sendBtn").disabled=false}
+}
+
+// === AUTO MSG ===
+function toggleAuto(){var b=document.getElementById("autoBtn");if(autoTimer){clearInterval(autoTimer);autoTimer=null;b.textContent="Start";b.classList.remove("running");document.getElementById("autoStatus").textContent="";return}var m=document.getElementById("autoMsg").value.trim();if(!m)return;var iv=parseInt(document.getElementById("autoInterval").value)*1000;b.textContent="Stop";b.classList.add("running");doSend(m);autoTimer=setInterval(function(){doSend(m)},iv);document.getElementById("autoStatus").textContent="Running"}
+function doSend(m){if(sending)return;document.getElementById("input").value=m;send()}
+
+// === MUSIC ===
+async function loadPlaylistUI(){try{var r=await fetch(API+"/api/playlist");playlist=await r.json();renderPL()}catch{}}
+function renderPL(){
+  var p=document.getElementById("plPanel");p.innerHTML="";
+  playlist.forEach(function(s,i){var d=document.createElement("div");d.className="pl-item"+(i===playIndex?" active":"");d.innerHTML='<span class="pl-num">'+(i+1)+'</span><span class="pl-title">'+s.title+'</span><button class="pl-del" onclick="event.stopPropagation();delMusic(\''+s.url.replace(/'/g,"\\'")+'\')">&times;</button>';d.onclick=function(){playTrack(i)};p.appendChild(d)});
+  var c=document.getElementById("musicCorner");if(playIndex>=0&&playlist[playIndex]){c.style.display="block";document.getElementById("mcText").textContent=playlist[playIndex].title}}
+async function addMusic(){var u=document.getElementById("musicUrl").value.trim();if(!u)return;await fetch(API+"/api/playlist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});document.getElementById("musicUrl").value="";await loadPlaylistUI()}
+async function delMusic(u){await fetch(API+"/api/playlist",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});await loadPlaylistUI()}
+function playTrack(i){playIndex=i;var t=playlist[i];if(!t)return;var pl=document.getElementById("musicPlayer");pl.src=t.url;pl.play().catch(function(){});document.getElementById("mTitle").textContent=t.title;document.getElementById("mSub").textContent="Track "+(i+1)+" of "+playlist.length;document.getElementById("musicCorner").style.display="block";document.getElementById("mcText").textContent=t.title;document.getElementById("heartBtn").innerHTML=liked[t.url]?"&#9829;":"&#9825;";document.getElementById("heartBtn").classList.toggle("liked",!!liked[t.url]);renderPL()}
+function playNextTrack(){if(!playlist.length)return;playTrack((playIndex+1)%playlist.length)}
+function playPrev(){if(!playlist.length)return;playTrack((playIndex-1+playlist.length)%playlist.length)}
+function togglePlay(){var p=document.getElementById("musicPlayer");if(p.paused){if(playIndex<0&&playlist.length)playTrack(0);else p.play()}else p.pause()}
+function onMusicPlay(){document.getElementById("vinyl").classList.add("spinning");document.getElementById("miniVinyl").classList.add("spinning");document.getElementById("needle").classList.add("down");document.getElementById("playBtn").innerHTML="&#9646;&#9646;";if(!listenStart)listenStart=Date.now();if(!listenInterval)listenInterval=setInterval(updateListenTimer,1000)}
+function onMusicPause(){document.getElementById("vinyl").classList.remove("spinning");document.getElementById("miniVinyl").classList.remove("spinning");document.getElementById("needle").classList.remove("down");document.getElementById("playBtn").innerHTML="&#9654;"}
+function updateListenTimer(){if(!listenStart)return;var s=Math.floor((Date.now()-listenStart)/1000);var m=Math.floor(s/60);var sec=s%60;document.getElementById("listenTimer").textContent="Listening together for "+m+":"+(sec<10?"0":"")+sec}
+function toggleHeart(){if(playIndex<0)return;var u=playlist[playIndex].url;liked[u]=!liked[u];document.getElementById("heartBtn").innerHTML=liked[u]?"&#9829;":"&#9825;";document.getElementById("heartBtn").classList.toggle("liked",liked[u]);saveSettings()}
+function openMusicPlayer(){document.getElementById("musicOverlay").classList.add("active")}
+function closeMusicPlayer(){document.getElementById("musicOverlay").classList.remove("active")}
+
+// === DOCUMENTS ===
+async function loadDocs(){var r=await fetch(API+"/api/documents");var d=await r.json();var l=document.getElementById("docList");l.innerHTML="";d.forEach(function(x){var div=document.createElement("div");div.className="doc-item";div.innerHTML='<span class="source" title="'+x.source+'">'+x.source+'</span><span class="chunks">'+x.chunks+'</span><button class="del" onclick="delDoc(\''+x.source.replace(/'/g,"\\'")+'\')">&times;</button>';l.appendChild(div)})}
+async function delDoc(s){await fetch(API+"/api/documents",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:s})});loadDocs()}
+function showModal(t){closeModals();document.getElementById(t==="text"?"textModal":"urlModal").classList.add("active")}
+function closeModals(){document.querySelectorAll(".modal-overlay").forEach(function(m){m.classList.remove("active")})}
+async function addText(){var s=document.getElementById("textSource").value||"untitled",t=document.getElementById("textContent").value;if(!t)return;await fetch(API+"/api/documents",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:s,text:t})});document.getElementById("textSource").value="";document.getElementById("textContent").value="";closeModals();loadDocs()}
+async function addUrl(){var u=document.getElementById("urlInput").value;if(!u)return;await fetch(API+"/api/documents/url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});document.getElementById("urlInput").value="";closeModals();loadDocs()}
+
+// === CHAT ===
+function renderMD(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/```([\s\S]*?)```/g,"<pre><code>$1</code></pre>").replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br>")}
+function addAssistantMsg(){var d=document.createElement("div");d.className="message assistant";d.appendChild(makeAvatar("noe"));var mc=document.createElement("div");mc.className="msg-content";var b=document.createElement("div");b.className="bubble";mc.appendChild(b);d.appendChild(mc);document.getElementById("messages").appendChild(d);document.getElementById("messages").scrollTop=999999;return d}
+
+async function send(){
+  if(sending)return;var inp=document.getElementById("input"),msg=inp.value.trim();if(!msg)return;inp.value="";inp.style.height="44px";
+  // User bubble
+  var ud=document.createElement("div");ud.className="message user";var umc=document.createElement("div");umc.className="msg-content";var ub=document.createElement("div");ub.className="bubble";ub.innerHTML=renderMD(msg);umc.appendChild(ub);ud.appendChild(umc);ud.appendChild(makeAvatar("vi"));document.getElementById("messages").appendChild(ud);document.getElementById("messages").scrollTop=999999;
+  chatHistory.push({role:"user",content:msg});
+  sendChatMessage(msg);
+}
+
+document.getElementById("input").addEventListener("input",function(){this.style.height="44px";this.style.height=Math.min(this.scrollHeight,120)+"px"});
+if(window.innerWidth<=768)document.getElementById("sidebar").classList.add("collapsed");
+init();
+</script>
+</body>
+</html>

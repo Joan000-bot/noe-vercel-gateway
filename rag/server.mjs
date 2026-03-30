@@ -4,9 +4,15 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_FILE = path.join(__dirname, "data", "documents.json");
-const PLAYLIST_FILE = path.join(__dirname, "data", "playlist.json");
+const DATA_DIR = path.join(__dirname, "data");
+const DATA_FILE = path.join(DATA_DIR, "documents.json");
+const PLAYLIST_FILE = path.join(DATA_DIR, "playlist.json");
 const PORT = 8800;
+const LOGIN_PASSWORD = "viraelnoe";
+
+// --- Generic JSON store ---
+function loadJSON(name) { try { return JSON.parse(fs.readFileSync(path.join(DATA_DIR, name + ".json"), "utf-8")); } catch { return []; } }
+function saveJSON(name, data) { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(path.join(DATA_DIR, name + ".json"), JSON.stringify(data, null, 2)); }
 const OPENROUTER_KEY = "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";
 const ELEVENLABS_KEY = "sk_d1dd504e19fbb397399a234384ca19f50d9a00254843bd5c";
 
@@ -323,7 +329,107 @@ http.createServer(async function (req, res) {
     return;
   }
 
-  // Static files
+  // API: auth
+  if (url.pathname === "/api/login" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    if (body.password === LOGIN_PASSWORD) return json(res, { ok: true, token: "noe-auth-ok" });
+    return json(res, { ok: false, error: "Wrong password" }, 401);
+  }
+
+  // API: whispers (碎碎念)
+  if (url.pathname === "/api/whispers" && req.method === "GET") { return json(res, loadJSON("whispers")); }
+  if (url.pathname === "/api/whispers" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("whispers");
+    items.unshift({ id: Date.now().toString(36), author: body.author || "Virael", content: body.content, mood: body.mood || "", time: new Date().toISOString(), likes: 0 });
+    saveJSON("whispers", items); return json(res, { ok: true });
+  }
+  if (url.pathname === "/api/whispers" && req.method === "DELETE") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("whispers").filter(function(w) { return w.id !== body.id; });
+    saveJSON("whispers", items); return json(res, { ok: true });
+  }
+
+  // API: diary
+  if (url.pathname === "/api/diary" && req.method === "GET") { return json(res, loadJSON("diary")); }
+  if (url.pathname === "/api/diary" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("diary");
+    items.unshift({ id: Date.now().toString(36), title: body.title, content: body.content, mood: body.mood || "", weather: body.weather || "", time: new Date().toISOString() });
+    saveJSON("diary", items); return json(res, { ok: true });
+  }
+  if (url.pathname === "/api/diary" && req.method === "DELETE") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("diary").filter(function(d) { return d.id !== body.id; });
+    saveJSON("diary", items); return json(res, { ok: true });
+  }
+
+  // API: timeline
+  if (url.pathname === "/api/timeline" && req.method === "GET") { return json(res, loadJSON("timeline")); }
+  if (url.pathname === "/api/timeline" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("timeline");
+    items.unshift({ id: Date.now().toString(36), title: body.title, content: body.content, date: body.date || new Date().toISOString().slice(0, 10), icon: body.icon || "", time: new Date().toISOString() });
+    saveJSON("timeline", items); return json(res, { ok: true });
+  }
+
+  // API: wall (留言墙)
+  if (url.pathname === "/api/wall" && req.method === "GET") { return json(res, loadJSON("wall")); }
+  if (url.pathname === "/api/wall" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("wall");
+    items.unshift({ id: Date.now().toString(36), author: body.author || "Anonymous", content: body.content, color: body.color || "#7eb8ff", time: new Date().toISOString() });
+    saveJSON("wall", items); return json(res, { ok: true });
+  }
+
+  // API: memories (记忆库)
+  if (url.pathname === "/api/memories" && req.method === "GET") { return json(res, loadJSON("memories")); }
+  if (url.pathname === "/api/memories" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("memories");
+    items.unshift({ id: Date.now().toString(36), title: body.title, content: body.content, tags: body.tags || [], time: new Date().toISOString() });
+    saveJSON("memories", items); return json(res, { ok: true });
+  }
+
+  // API: feed (社交动态)
+  if (url.pathname === "/api/feed" && req.method === "GET") { return json(res, loadJSON("feed")); }
+  if (url.pathname === "/api/feed" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("feed");
+    items.unshift({ id: Date.now().toString(36), author: body.author || "Virael", content: body.content, image: body.image || "", likes: 0, comments: [], time: new Date().toISOString() });
+    saveJSON("feed", items); return json(res, { ok: true });
+  }
+  if (url.pathname === "/api/feed/like" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("feed");
+    var post = items.find(function(p) { return p.id === body.id; });
+    if (post) post.likes = (post.likes || 0) + 1;
+    saveJSON("feed", items); return json(res, { ok: true });
+  }
+  if (url.pathname === "/api/feed/comment" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("feed");
+    var post = items.find(function(p) { return p.id === body.id; });
+    if (post) { if (!post.comments) post.comments = []; post.comments.push({ author: body.author || "Noe", content: body.content, time: new Date().toISOString() }); }
+    saveJSON("feed", items); return json(res, { ok: true });
+  }
+
+  // API: album
+  if (url.pathname === "/api/album" && req.method === "GET") { return json(res, loadJSON("album")); }
+  if (url.pathname === "/api/album" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("album");
+    items.unshift({ id: Date.now().toString(36), url: body.url, caption: body.caption || "", time: new Date().toISOString() });
+    saveJSON("album", items); return json(res, { ok: true });
+  }
+  if (url.pathname === "/api/album" && req.method === "DELETE") {
+    var body = JSON.parse(await readBody(req));
+    var items = loadJSON("album").filter(function(a) { return a.id !== body.id; });
+    saveJSON("album", items); return json(res, { ok: true });
+  }
+
+  // Static files - /chat serves chat page, / serves portal
+  if (url.pathname === "/chat") { return serveStatic(res, path.join(__dirname, "public", "chat.html")); }
   var filePath = url.pathname === "/" ? "/index.html" : url.pathname;
   serveStatic(res, path.join(__dirname, "public", filePath));
 
