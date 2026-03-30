@@ -301,6 +301,9 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
     </div>
     <button class="auto-btn" id="autoBtn" onclick="toggleAuto()" style="margin-bottom:10px">Start Auto</button>
     <div class="auto-status" id="autoStatus"></div>
+    <div style="margin:10px 0;border-top:1px solid var(--border);padding-top:10px">
+      <button onclick="clearChatHistoryAll()" style="width:100%;padding:8px;background:rgba(255,60,60,0.1);border:1px solid rgba(255,60,60,0.3);border-radius:8px;color:#f66;font-size:12px;cursor:pointer;font-family:var(--fb)">Clear Chat History</button>
+    </div>
     <div class="modal-btns">
       <button onclick="closeModals()">Cancel</button>
       <button class="primary" onclick="savePromptSettings()">Save</button>
@@ -350,7 +353,7 @@ async function init(){
   var r=await fetch(API+"/api/models");var models=await r.json();
   var sel=document.getElementById("modelSelect");sel.innerHTML="";
   models.forEach(function(m){var o=document.createElement("option");o.value=m.id;o.textContent=m.name;sel.appendChild(o)});
-  loadDocs();loadVoices();loadPlaylistUI();
+  loadDocs();loadVoices();loadPlaylistUI();loadChatHistory();
 }
 
 // === SETTINGS ===
@@ -447,7 +450,7 @@ function sendChatMessage(msg){
       var vb=document.createElement("button");vb.textContent="&#9835; Play";vb.innerHTML="&#9835; Play";vb.onclick=function(){playTTS(fullText,vb)};acts.appendChild(vb);mc.appendChild(acts);
       if(voiceEnabled)playTTS(fullText);
     }
-    chatHistory.push({role:"assistant",content:fullText});sending=false;document.getElementById("sendBtn").disabled=false}
+    chatHistory.push({role:"assistant",content:fullText});saveChatHistory();sending=false;document.getElementById("sendBtn").disabled=false}
 }
 
 // === AUTO MSG ===
@@ -481,6 +484,24 @@ function closeModals(){document.querySelectorAll(".modal-overlay").forEach(funct
 async function addText(){var s=document.getElementById("textSource").value||"untitled",t=document.getElementById("textContent").value;if(!t)return;await fetch(API+"/api/documents",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:s,text:t})});document.getElementById("textSource").value="";document.getElementById("textContent").value="";closeModals();loadDocs()}
 async function addUrl(){var u=document.getElementById("urlInput").value;if(!u)return;await fetch(API+"/api/documents/url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});document.getElementById("urlInput").value="";closeModals();loadDocs()}
 
+// === CHAT HISTORY ===
+function saveChatHistory(){localStorage.setItem("noe-chat",JSON.stringify(chatHistory.slice(-100)))}
+function loadChatHistory(){
+  try{chatHistory=JSON.parse(localStorage.getItem("noe-chat"))||[]}catch{chatHistory=[]}
+  var el=document.getElementById("messages");
+  chatHistory.forEach(function(m){
+    if(m.role==="user"){
+      var ud=document.createElement("div");ud.className="message user";var umc=document.createElement("div");umc.className="msg-content";var ub=document.createElement("div");ub.className="bubble";ub.innerHTML=renderMD(m.content);umc.appendChild(ub);ud.appendChild(umc);ud.appendChild(makeAvatar("vi"));el.appendChild(ud);
+    }else{
+      var d=document.createElement("div");d.className="message assistant";d.appendChild(makeAvatar("noe"));var mc=document.createElement("div");mc.className="msg-content";var b=document.createElement("div");b.className="bubble";b.innerHTML=renderMD(m.content);mc.appendChild(b);
+      var acts=document.createElement("div");acts.className="msg-actions";var vb=document.createElement("button");vb.innerHTML="&#9835; Play";vb.onclick=(function(txt){return function(){playTTS(txt,vb)}})(m.content);acts.appendChild(vb);mc.appendChild(acts);
+      d.appendChild(mc);el.appendChild(d);
+    }
+  });
+  el.scrollTop=999999;
+}
+function clearChatHistoryAll(){if(confirm("Clear all chat history?")){chatHistory=[];localStorage.removeItem("noe-chat");document.getElementById("messages").innerHTML="";}}
+
 // === CHAT ===
 function renderMD(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/```([\s\S]*?)```/g,"<pre><code>$1</code></pre>").replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br>")}
 function addAssistantMsg(){var d=document.createElement("div");d.className="message assistant";d.appendChild(makeAvatar("noe"));var mc=document.createElement("div");mc.className="msg-content";var b=document.createElement("div");b.className="bubble";mc.appendChild(b);d.appendChild(mc);document.getElementById("messages").appendChild(d);document.getElementById("messages").scrollTop=999999;return d}
@@ -490,6 +511,7 @@ async function send(){
   // User bubble
   var ud=document.createElement("div");ud.className="message user";var umc=document.createElement("div");umc.className="msg-content";var ub=document.createElement("div");ub.className="bubble";ub.innerHTML=renderMD(msg);umc.appendChild(ub);ud.appendChild(umc);ud.appendChild(makeAvatar("vi"));document.getElementById("messages").appendChild(ud);document.getElementById("messages").scrollTop=999999;
   chatHistory.push({role:"user",content:msg});
+  saveChatHistory();
   sendChatMessage(msg);
 }
 
