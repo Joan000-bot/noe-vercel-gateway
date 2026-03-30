@@ -19,7 +19,10 @@
 body { font-family: var(--font-body); background: var(--bg); color: var(--text); height: 100vh; display: flex; font-size: 15px; }
 
 /* Sidebar */
-.sidebar { width: 300px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+.sidebar { width: 300px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; transition: margin-left 0.3s ease, opacity 0.3s ease; }
+.sidebar.collapsed { margin-left: -300px; opacity: 0; pointer-events: none; }
+.sidebar-toggle { position: fixed; top: 12px; left: 12px; z-index: 50; width: 36px; height: 36px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text2); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.sidebar-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 .ss { padding: 14px 16px; border-bottom: 1px solid var(--border); }
@@ -144,14 +147,16 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 .hidden { display: none; }
 
 @media (max-width: 768px) {
-  .sidebar { display: none; }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; }
+  .sidebar.collapsed { margin-left: -300px; }
   .music-corner .playing-text { max-width: 100px; }
 }
 </style>
 </head>
 <body>
 
-<div class="sidebar">
+<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">&#9776;</button>
+<div class="sidebar" id="sidebar">
   <!-- Model -->
   <div class="ss">
     <h2>Model</h2>
@@ -378,6 +383,13 @@ function applyTheme() {
   else { bgEl.style.backgroundImage = 'none'; }
 
   saveSettings();
+}
+
+// --- Sidebar toggle ---
+function toggleSidebar() {
+  var sb = document.getElementById("sidebar");
+  sb.classList.toggle("collapsed");
+  document.getElementById("sidebarToggle").innerHTML = sb.classList.contains("collapsed") ? "&#9776;" : "&#10005;";
 }
 
 // --- Chat background upload ---
@@ -677,6 +689,9 @@ document.getElementById("input").addEventListener("input", function() {
   this.style.height = "48px";
   this.style.height = Math.min(this.scrollHeight, 150) + "px";
 });
+
+// Auto-collapse sidebar on mobile
+if (window.innerWidth <= 768) document.getElementById("sidebar").classList.add("collapsed");
 
 init();
 </script>
