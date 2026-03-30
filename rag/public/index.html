@@ -65,11 +65,16 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
 .chat-header{padding:10px 24px 10px 56px;border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:1;position:relative;backdrop-filter:blur(10px)}
 .chat-header .logo{font-family:var(--font-display);font-size:28px;font-weight:700;color:var(--accent);font-style:italic;letter-spacing:3px;text-shadow:0 0 20px rgba(126,184,255,0.3)}
 
-/* Music corner button */
-.music-corner{position:absolute;top:8px;right:16px;z-index:2}
-.music-corner button{background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:20px;padding:6px 14px;color:var(--text2);font-size:12px;cursor:pointer;font-family:var(--font-body);display:flex;align-items:center;gap:6px;backdrop-filter:blur(10px)}
-.music-corner button:hover{border-color:var(--accent);color:var(--accent)}
-.music-corner .np{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--accent)}
+/* Header right */
+.header-right{position:absolute;right:16px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px}
+.mini-vinyl-wrap{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 10px;border-radius:20px;transition:background .2s}
+.mini-vinyl-wrap:hover{background:rgba(255,255,255,0.05)}
+.mini-vinyl{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle,#222 35%,#111 36%,#222 55%,#111 56%,#222 75%,#1a1a1a 100%);box-shadow:0 0 8px rgba(0,0,0,0.4);position:relative;flex-shrink:0}
+.mini-vinyl.spinning{animation:spin 3s linear infinite}
+.mini-vinyl-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:var(--accent2);border:1.5px solid #444}
+.np{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--accent)}
+.gear-btn{background:none;border:1px solid var(--border);border-radius:50%;width:32px;height:32px;color:var(--text2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.gear-btn:hover{border-color:var(--accent);color:var(--accent);transform:rotate(45deg)}
 
 /* Messages */
 .messages{flex:1;overflow-y:auto;padding:20px;z-index:1;position:relative}
@@ -214,10 +219,6 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
     <div class="auto-row"><input type="text" id="autoMsg" placeholder="Message..."><select id="autoInterval"><option value="30">30s</option><option value="60" selected>1m</option><option value="300">5m</option><option value="600">10m</option></select></div>
     <button class="auto-btn" id="autoBtn" onclick="toggleAuto()">Start</button><div class="auto-status" id="autoStatus"></div>
   </div>
-  <div class="ss">
-    <h2>Listen Together</h2>
-    <div class="bg-input"><input type="url" id="musicUrl" placeholder="Music URL..."><button onclick="addMusic()" style="background:var(--accent2);color:#fff;border-color:var(--accent2)">+</button></div>
-  </div>
   <div class="ss" style="flex:1;display:flex;flex-direction:column;min-height:0">
     <h2>Knowledge Base</h2>
     <div class="doc-list" id="docList"></div>
@@ -230,7 +231,13 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
   <div class="chat-bg" id="chatBg"></div>
   <div class="chat-header">
     <div class="logo">Noe</div>
-    <div class="music-corner" id="musicCorner" style="display:none"><button onclick="openMusicPlayer()"><span>&#9835;</span><span class="np" id="mcText"></span></button></div>
+    <div class="header-right">
+      <div class="mini-vinyl-wrap" onclick="openMusicPlayer()" title="Listen Together">
+        <div class="mini-vinyl" id="miniVinyl"><div class="mini-vinyl-center"></div></div>
+        <span class="np" id="mcText"></span>
+      </div>
+      <button class="gear-btn" onclick="openSettings()" title="Settings">&#9881;</button>
+    </div>
   </div>
   <div class="messages" id="messages"></div>
   <div class="input-area">
@@ -263,6 +270,10 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
   </div>
   <button class="heart-btn" id="heartBtn" onclick="toggleHeart()">&#9825;</button>
   <div class="listen-timer" id="listenTimer">Listening together for 0:00</div>
+  <div style="margin-top:14px;display:flex;gap:6px;width:300px">
+    <input type="url" id="musicUrl" placeholder="Paste music URL..." style="flex:1;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-family:var(--font-body);outline:none">
+    <button onclick="addMusic()" style="padding:8px 14px;background:var(--accent2);border:none;border-radius:8px;color:#fff;font-size:12px;cursor:pointer">+</button>
+  </div>
   <div class="playlist-panel" id="plPanel"></div>
 </div>
 <audio id="musicPlayer" onended="playNextTrack()" onplay="onMusicPlay()" onpause="onMusicPause()"></audio>
@@ -270,6 +281,26 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
 <!-- MODALS -->
 <div class="modal-overlay" id="textModal"><div class="modal"><h3>Add Text</h3><input id="textSource" placeholder="Name"><textarea id="textContent" placeholder="Paste text..."></textarea><div class="modal-btns"><button onclick="closeModals()">Cancel</button><button class="primary" onclick="addText()">Add</button></div></div></div>
 <div class="modal-overlay" id="urlModal"><div class="modal"><h3>Add URL</h3><input id="urlInput" placeholder="https://..."><div class="modal-btns"><button onclick="closeModals()">Cancel</button><button class="primary" onclick="addUrl()">Fetch</button></div></div></div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="width:440px">
+    <h3>Settings</h3>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">System Prompt</div>
+    <textarea id="systemPrompt" placeholder="Define Noe's personality, behavior, context..." style="height:120px"></textarea>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Model</div>
+    <select id="settingsModel" style="margin-bottom:10px"></select>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Temperature</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <input type="range" id="tempSlider" min="0" max="100" value="70" style="flex:1">
+      <span style="font-size:11px;color:var(--accent)" id="tempLabel">0.7</span>
+    </div>
+    <div class="modal-btns">
+      <button onclick="closeModals()">Cancel</button>
+      <button class="primary" onclick="savePromptSettings()">Save</button>
+    </div>
+  </div>
+</div>
 
 <script>
 var API=window.location.origin,chatHistory=[],sending=false,autoTimer=null,voiceEnabled=false,currentAudio=null;
@@ -317,8 +348,24 @@ async function init(){
 }
 
 // === SETTINGS ===
-function saveSettings(){localStorage.setItem("noe-s",JSON.stringify({accent:document.getElementById("themeAccent").value,alpha:document.getElementById("bubbleAlpha").value,chatBg:document.getElementById("chatBgUrl").value,na:noeAvatar,va:viAvatar,liked:liked}))}
-function loadSettings(){try{var s=JSON.parse(localStorage.getItem("noe-s"));if(!s)return;if(s.accent)document.getElementById("themeAccent").value=s.accent;if(s.alpha)document.getElementById("bubbleAlpha").value=s.alpha;if(s.chatBg)document.getElementById("chatBgUrl").value=s.chatBg;if(s.na){noeAvatar=s.na;document.getElementById("noeAP").innerHTML='<img src="'+s.na+'">'};if(s.va){viAvatar=s.va;document.getElementById("viAP").innerHTML='<img src="'+s.va+'">'};if(s.liked)liked=s.liked;applyTheme()}catch{}}
+var customPrompt="",customTemp=0.7;
+function saveSettings(){localStorage.setItem("noe-s",JSON.stringify({accent:document.getElementById("themeAccent").value,alpha:document.getElementById("bubbleAlpha").value,chatBg:document.getElementById("chatBgUrl").value,na:noeAvatar,va:viAvatar,liked:liked,prompt:customPrompt,temp:customTemp}))}
+function loadSettings(){try{var s=JSON.parse(localStorage.getItem("noe-s"));if(!s)return;if(s.accent)document.getElementById("themeAccent").value=s.accent;if(s.alpha)document.getElementById("bubbleAlpha").value=s.alpha;if(s.chatBg)document.getElementById("chatBgUrl").value=s.chatBg;if(s.na){noeAvatar=s.na;document.getElementById("noeAP").innerHTML='<img src="'+s.na+'">'};if(s.va){viAvatar=s.va;document.getElementById("viAP").innerHTML='<img src="'+s.va+'">'};if(s.liked)liked=s.liked;if(s.prompt)customPrompt=s.prompt;if(s.temp)customTemp=s.temp;applyTheme()}catch{}}
+function openSettings(){
+  document.getElementById("systemPrompt").value=customPrompt;
+  document.getElementById("tempSlider").value=Math.round(customTemp*100);
+  document.getElementById("tempLabel").textContent=customTemp;
+  document.getElementById("tempSlider").oninput=function(){document.getElementById("tempLabel").textContent=(this.value/100).toFixed(1)};
+  // Sync model select
+  var sel=document.getElementById("settingsModel");sel.innerHTML=document.getElementById("modelSelect").innerHTML;sel.value=document.getElementById("modelSelect").value;
+  document.getElementById("settingsModal").classList.add("active");
+}
+function savePromptSettings(){
+  customPrompt=document.getElementById("systemPrompt").value;
+  customTemp=parseInt(document.getElementById("tempSlider").value)/100;
+  document.getElementById("modelSelect").value=document.getElementById("settingsModel").value;
+  saveSettings();closeModals();
+}
 function applyTheme(){var a=document.getElementById("themeAccent").value,al=parseInt(document.getElementById("bubbleAlpha").value)/100,bg=document.getElementById("chatBgUrl").value;
   document.getElementById("alphaLabel").textContent=Math.round(al*100)+"%";
   var rgb=hexToRgb(a);document.documentElement.style.setProperty("--accent",a);document.documentElement.style.setProperty("--accent2",a);document.documentElement.style.setProperty("--bubble-user","rgba("+rgb+","+al+")");
@@ -378,7 +425,7 @@ function sendChatMessage(msg){
   sending=true;document.getElementById("sendBtn").disabled=true;
   var msgDiv=addAssistantMsg();var mc=msgDiv.querySelector(".msg-content");var bubble=msgDiv.querySelector(".bubble");
   var thinkingBlock=null,fullText="",thinkingText="",sources=[];
-  fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg,model:document.getElementById("modelSelect").value,history:chatHistory.slice(-20),thinking_budget:parseInt(document.getElementById("thinkingSlider").value)})}).then(function(r){
+  fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg,model:document.getElementById("modelSelect").value,history:chatHistory.slice(-20),thinking_budget:parseInt(document.getElementById("thinkingSlider").value),system_prompt:customPrompt,temperature:customTemp})}).then(function(r){
     var reader=r.body.getReader(),decoder=new TextDecoder(),buf="";
     function read(){reader.read().then(function(res){
       if(res.done){finish();return}
@@ -413,8 +460,8 @@ function playTrack(i){playIndex=i;var t=playlist[i];if(!t)return;var pl=document
 function playNextTrack(){if(!playlist.length)return;playTrack((playIndex+1)%playlist.length)}
 function playPrev(){if(!playlist.length)return;playTrack((playIndex-1+playlist.length)%playlist.length)}
 function togglePlay(){var p=document.getElementById("musicPlayer");if(p.paused){if(playIndex<0&&playlist.length)playTrack(0);else p.play()}else p.pause()}
-function onMusicPlay(){document.getElementById("vinyl").classList.add("spinning");document.getElementById("needle").classList.add("down");document.getElementById("playBtn").innerHTML="&#9646;&#9646;";if(!listenStart)listenStart=Date.now();if(!listenInterval)listenInterval=setInterval(updateListenTimer,1000)}
-function onMusicPause(){document.getElementById("vinyl").classList.remove("spinning");document.getElementById("needle").classList.remove("down");document.getElementById("playBtn").innerHTML="&#9654;"}
+function onMusicPlay(){document.getElementById("vinyl").classList.add("spinning");document.getElementById("miniVinyl").classList.add("spinning");document.getElementById("needle").classList.add("down");document.getElementById("playBtn").innerHTML="&#9646;&#9646;";if(!listenStart)listenStart=Date.now();if(!listenInterval)listenInterval=setInterval(updateListenTimer,1000)}
+function onMusicPause(){document.getElementById("vinyl").classList.remove("spinning");document.getElementById("miniVinyl").classList.remove("spinning");document.getElementById("needle").classList.remove("down");document.getElementById("playBtn").innerHTML="&#9654;"}
 function updateListenTimer(){if(!listenStart)return;var s=Math.floor((Date.now()-listenStart)/1000);var m=Math.floor(s/60);var sec=s%60;document.getElementById("listenTimer").textContent="Listening together for "+m+":"+(sec<10?"0":"")+sec}
 function toggleHeart(){if(playIndex<0)return;var u=playlist[playIndex].url;liked[u]=!liked[u];document.getElementById("heartBtn").innerHTML=liked[u]?"&#9829;":"&#9825;";document.getElementById("heartBtn").classList.toggle("liked",liked[u]);saveSettings()}
 function openMusicPlayer(){document.getElementById("musicOverlay").classList.add("active")}

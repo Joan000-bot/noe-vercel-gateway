@@ -255,6 +255,8 @@ http.createServer(async function (req, res) {
     var model = body.model || MODELS[0].id;
     var history = body.history || [];
     var thinkingBudget = body.thinking_budget || 0;
+    var customPrompt = body.system_prompt || "";
+    var temperature = body.temperature || 0.7;
 
     var docs = loadDocs();
     var relevant = search(docs, query, 5);
@@ -265,13 +267,15 @@ http.createServer(async function (req, res) {
         "\n---\n\n请根据以上内容回答用户的问题。如果知识库中没有相关信息，请如实告知。\n\n";
     }
 
+    var sysContent = customPrompt || "你是 Noe，Virael 的 AI 助手。你温柔、聪明、有个性。回答时优先参考知识库中的内容。";
+    if (context) sysContent += "\n\n" + context;
     var messages = [
-      { role: "system", content: "你是 Noe，Virael 的 AI 助手。你温柔、聪明、有个性。回答时优先参考知识库中的内容。" + (context ? "\n\n" + context : "") }
+      { role: "system", content: sysContent }
     ];
     for (var h of history) messages.push(h);
     messages.push({ role: "user", content: query });
 
-    var requestBody = { model: model, messages: messages, stream: true };
+    var requestBody = { model: model, messages: messages, stream: true, temperature: temperature };
     if (thinkingBudget > 0) requestBody.thinking = { type: "enabled", budget_tokens: thinkingBudget };
 
     try {
