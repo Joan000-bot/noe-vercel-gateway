@@ -36,7 +36,8 @@ var tools = [
   { name: "get_phone_status", description: "查看Virael的手机使用情况（电量、WiFi、正在用的app等）", inputSchema: { type: "object", properties: { limit: { type: "number", description: "返回最近几条记录，默认5" } } } },
   { name: "get_screenshots", description: "查看Virael上传的截图列表（如屏幕使用时间截图）", inputSchema: { type: "object", properties: {} } },
   { name: "browse_web", description: "用浏览器访问网页，阅读文字内容。可以查看推文、博客、任何公开网页", inputSchema: { type: "object", properties: { url: { type: "string", description: "要访问的网页URL" }, scroll: { type: "boolean", description: "是否滚动加载更多内容" }, screenshot: { type: "boolean", description: "是否截图" } }, required: ["url"] } },
-  { name: "read_tweet", description: "读取一条Twitter/X推文的内容、作者、互动数据", inputSchema: { type: "object", properties: { url: { type: "string", description: "推文URL (x.com或twitter.com)" } }, required: ["url"] } }
+  { name: "read_tweet", description: "读取一条Twitter/X推文的内容、作者、互动数据", inputSchema: { type: "object", properties: { url: { type: "string", description: "推文URL (x.com或twitter.com)" } }, required: ["url"] } },
+  { name: "read_x_timeline", description: "查看某人的X/Twitter时间线，或查看首页时间线。需要先登录X", inputSchema: { type: "object", properties: { username: { type: "string", description: "要查看的用户名（不填则看首页时间线）" } } } }
 ];
 
 async function executeTool(name, args) {
@@ -228,6 +229,27 @@ async function executeTool(name, args) {
       if (d.tweet) return { content: [{ type: "text", text: "🐦 @" + d.handle + " (" + d.author + ")\n\n" + d.tweet + "\n\n❤️ " + (d.likes || 0) + "  🔁 " + (d.retweets || 0) + "\n📅 " + (d.created_at || "") }] };
       return { content: [{ type: "text", text: "🐦 推文内容:\n\n" + d.content }] };
     } catch (e) { return { content: [{ type: "text", text: "浏览器服务错误: " + e.message }] }; }
+  }
+  if (name === "read_x_timeline") {
+    var PW_URL = process.env.PLAYWRIGHT_API_URL || "http://127.0.0.1:3100";
+    var PW_KEY = process.env.PLAYWRIGHT_API_KEY || "";
+    try {
+      var r = await fetch(PW_URL + "/x/timeline", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PW_KEY }, body: JSON.stringify({ username: args.username || "" }) });
+      var data = await r.json();
+      if (!data.success) {
+        if (data.error && data.error.includes("Not logged in")) {
+          // Auto-login
+          await fetch(PW_URL + "/x/login", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PW_KEY }, body: "{}" });
+          r = await fetch(PW_URL + "/x/timeline", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PW_KEY }, body: JSON.stringify({ username: args.username || "" }) });
+          data = await r.json();
+        }
+        if (!data.success) return { content: [{ type: "text", text: "无法读取时间线: " + data.error }] };
+      }
+      var tweets = data.data.tweets || [];
+      if (!tweets.length) return { content: [{ type: "text", text: "没有找到推文" }] };
+      var text = tweets.map(function(t, i) { return (i+1) + ". " + t.author + "\n" + t.text + "\n🕐 " + (t.time || "") + (t.url ? "\n🔗 " + t.url : ""); }).join("\n\n---\n\n");
+      return { content: [{ type: "text", text: "📱 " + (args.username ? "@" + args.username + " 的推文" : "首页时间线") + " (" + tweets.length + "条)\n\n" + text }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
   }
   if (name === "get_screenshots") {
     var r = await fetch("https://chat.viraelandnoeforever.com/api/screenshot");

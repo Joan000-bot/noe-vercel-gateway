@@ -3,6 +3,9 @@ import { chromium } from "playwright";
 import fs from "fs";
 
 const API_KEY = (() => { try { return fs.readFileSync("/root/playwright-key.txt", "utf-8").trim(); } catch { return "pw-noe-2026"; } })();
+const X_USER = (() => { try { return fs.readFileSync("/root/x-username.txt", "utf-8").trim(); } catch { return ""; } })();
+const X_PASS = (() => { try { return fs.readFileSync("/root/x-password.txt", "utf-8").trim(); } catch { return ""; } })();
+const X_COOKIES_FILE = "/root/x-cookies.json";
 const PORT = 3100;
 
 let browser = null;
@@ -121,6 +124,103 @@ http.createServer(async (req, res) => {
       res.end(JSON.stringify({ success: true, data: { content, url } }));
     } catch (e) {
       res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message, url }));
+    } finally {
+      if (context) await context.close().catch(() => {});
+    }
+    return;
+  }
+
+  // /x/login - Login to X and save cookies
+  if (req.url === "/x/login") {
+    if (!X_USER || !X_PASS) { res.writeHead(400); return res.end(JSON.stringify({ error: "X credentials not configured" })); }
+    var context, page;
+    try {
+      var b = await getBrowser();
+      context = await b.newContext({ viewport: { width: 1280, height: 720 }, locale: "en-US" });
+      page = await context.newPage();
+
+      await page.goto("https://x.com/i/flow/login", { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForTimeout(3000);
+
+      // Enter username
+      await page.fill('input[autocomplete="username"]', X_USER);
+      await page.click('button:has-text("Next")');
+      await page.waitForTimeout(2000);
+
+      // Enter password
+      await page.fill('input[type="password"]', X_PASS);
+      await page.click('button:has-text("Log in")');
+      await page.waitForTimeout(5000);
+
+      // Check if logged in
+      var currentUrl = page.url();
+      if (currentUrl.includes("/home") || !currentUrl.includes("/login")) {
+        // Save cookies
+        var cookies = await context.cookies();
+        fs.writeFileSync(X_COOKIES_FILE, JSON.stringify(cookies, null, 2));
+        res.end(JSON.stringify({ success: true, message: "Logged in and cookies saved", url: currentUrl }));
+      } else {
+        // Might need additional verification
+        var pageText = await page.evaluate(() => document.body?.innerText?.substring(0, 2000) || "");
+        res.end(JSON.stringify({ success: false, message: "Login may need verification", url: currentUrl, pageText }));
+      }
+    } catch (e) {
+      res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message }));
+    } finally {
+      if (context) await context.close().catch(() => {});
+    }
+    return;
+  }
+
+  // /x/timeline - Read X timeline with saved cookies
+  if (req.url === "/x/timeline") {
+    var username = body.username || "";
+    var context, page;
+    try {
+      // Load saved cookies
+      var cookies = [];
+      try { cookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8")); } catch {}
+      if (!cookies.length) { return res.end(JSON.stringify({ success: false, error: "Not logged in. Call /x/login first." })); }
+
+      var b = await getBrowser();
+      context = await b.newContext({ viewport: { width: 1280, height: 720 }, locale: "zh-CN" });
+      await context.addCookies(cookies);
+      page = await context.newPage();
+
+      var targetUrl = username ? "https://x.com/" + username : "https://x.com/home";
+      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
+      await page.waitForTimeout(4000);
+
+      // Scroll to load tweets
+      await page.evaluate(async () => { for (var i = 0; i < 2; i++) { window.scrollBy(0, window.innerHeight); await new Promise(r => setTimeout(r, 1500)); } window.scrollTo(0, 0); });
+      await page.waitForTimeout(1000);
+
+      // Extract tweets
+      var tweets = await page.evaluate(() => {
+        var articles = document.querySelectorAll('article[data-testid="tweet"]');
+        return Array.from(articles).slice(0, 10).map(a => {
+          var nameEl = a.querySelector('[data-testid="User-Name"]');
+          var textEl = a.querySelector('[data-testid="tweetText"]');
+          var timeEl = a.querySelector('time');
+          var links = a.querySelectorAll('a[href*="/status/"]');
+          var tweetLink = "";
+          for (var l of links) { if (l.href.match(/\/status\/\d+$/)) { tweetLink = l.href; break; } }
+          return {
+            author: nameEl ? nameEl.innerText.replace(/\n/g, " ") : "",
+            text: textEl ? textEl.innerText : "",
+            time: timeEl ? timeEl.getAttribute("datetime") : "",
+            url: tweetLink
+          };
+        }).filter(t => t.text);
+      });
+
+      // Update cookies in case they refreshed
+      var newCookies = await context.cookies();
+      fs.writeFileSync(X_COOKIES_FILE, JSON.stringify(newCookies, null, 2));
+
+      res.end(JSON.stringify({ success: true, data: { tweets, url: targetUrl, count: tweets.length } }));
+    } catch (e) {
+      res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message }));
     } finally {
       if (context) await context.close().catch(() => {});
     }
