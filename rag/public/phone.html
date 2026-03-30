@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Phone Status</title>
+<style>
+body{background:#0a0f1e;color:#d0d8f0;font-family:-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+h1{font-size:20px;margin-bottom:20px;color:#7eb8ff}
+.info{background:rgba(255,255,255,0.05);border:1px solid rgba(70,90,150,0.3);border-radius:12px;padding:16px;width:100%;max-width:320px;margin-bottom:16px;font-size:14px;line-height:1.8}
+.info div{display:flex;justify-content:space-between}
+.info .label{color:rgba(150,170,220,0.6)}
+.info .val{color:#7eb8ff}
+button{width:100%;max-width:320px;padding:16px;background:#5a9ae6;border:none;border-radius:12px;color:#fff;font-size:16px;cursor:pointer;margin-top:8px}
+button:active{opacity:0.7}
+.status{margin-top:12px;font-size:13px;color:rgba(150,170,220,0.6);text-align:center}
+.auto-label{font-size:12px;color:rgba(150,170,220,0.4);margin-top:16px;display:flex;align-items:center;gap:8px}
+</style>
+</head>
+<body>
+<h1>Phone Status</h1>
+<div class="info" id="info">Detecting...</div>
+<button onclick="report()">Send to Noe</button>
+<div class="auto-label"><input type="checkbox" id="autoCheck" onchange="toggleAuto()"> Auto-send every 10 minutes</div>
+<div class="status" id="status"></div>
+
+<script>
+var data = {};
+
+async function detect() {
+  var info = document.getElementById("info");
+  data = {};
+
+  // Battery
+  if (navigator.getBattery) {
+    try {
+      var b = await navigator.getBattery();
+      data.battery = Math.round(b.level * 100);
+      data.charging = b.charging;
+    } catch {}
+  }
+
+  // Network
+  if (navigator.connection) {
+    data.wifi = navigator.connection.type || navigator.connection.effectiveType || "unknown";
+  }
+
+  // Online
+  data.note = navigator.onLine ? "Online" : "Offline";
+
+  // Screen
+  data.note += " | " + screen.width + "x" + screen.height;
+
+  // Time
+  data.note += " | " + new Date().toLocaleString("zh-CN", {timeZone: "Asia/Shanghai"});
+
+  var html = "";
+  if (data.battery !== undefined) html += '<div><span class="label">Battery</span><span class="val">' + data.battery + '%' + (data.charging ? ' ⚡' : '') + '</span></div>';
+  if (data.wifi) html += '<div><span class="label">Network</span><span class="val">' + data.wifi + '</span></div>';
+  html += '<div><span class="label">Status</span><span class="val">' + (navigator.onLine ? 'Online' : 'Offline') + '</span></div>';
+  html += '<div><span class="label">Time</span><span class="val">' + new Date().toLocaleTimeString("zh-CN") + '</span></div>';
+  info.innerHTML = html;
+}
+
+async function report() {
+  await detect();
+  document.getElementById("status").textContent = "Sending...";
+  try {
+    var r = await fetch("/api/phone", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(data)
+    });
+    var d = await r.json();
+    document.getElementById("status").textContent = d.ok ? "Sent! " + new Date().toLocaleTimeString() : "Error";
+  } catch(e) {
+    document.getElementById("status").textContent = "Error: " + e.message;
+  }
+}
+
+var autoTimer = null;
+function toggleAuto() {
+  if (document.getElementById("autoCheck").checked) {
+    report();
+    autoTimer = setInterval(report, 600000);
+  } else {
+    clearInterval(autoTimer);
+    autoTimer = null;
+  }
+}
+
+detect();
+</script>
+</body>
+</html>
