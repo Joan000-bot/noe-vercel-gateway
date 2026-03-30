@@ -387,6 +387,16 @@ http.createServer(async function (req, res) {
     return json(res, { ok: true });
   }
   if (url.pathname === "/api/phone" && req.method === "GET") {
+    // If has query params, treat as report (for iOS Shortcuts)
+    if (url.searchParams.toString()) {
+      var logs = loadJSON("phone");
+      var entry = { time: new Date().toISOString() };
+      for (var [k, v] of url.searchParams) entry[k] = v;
+      logs.unshift(entry);
+      if (logs.length > 500) logs = logs.slice(0, 500);
+      saveJSON("phone", logs);
+      return json(res, { ok: true });
+    }
     return json(res, loadJSON("phone").slice(0, 50));
   }
 
