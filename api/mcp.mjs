@@ -31,7 +31,8 @@ var tools = [
   { name: "skip_to_next", description: "下一首", inputSchema: { type: "object", properties: {} } },
   { name: "skip_to_previous", description: "上一首", inputSchema: { type: "object", properties: {} } },
   { name: "set_volume", description: "调整音量（0-100）", inputSchema: { type: "object", properties: { volume: { type: "number" } }, required: ["volume"] } },
-  { name: "shuffle_playback", description: "切换随机播放", inputSchema: { type: "object", properties: { state: { type: "boolean" } }, required: ["state"] } }
+  { name: "shuffle_playback", description: "切换随机播放", inputSchema: { type: "object", properties: { state: { type: "boolean" } }, required: ["state"] } },
+  { name: "exec_vps", description: "在VPS上执行命令", inputSchema: { type: "object", properties: { command: { type: "string", description: "要执行的命令" }, cwd: { type: "string", description: "工作目录" } }, required: ["command"] } }
 ];
 
 async function executeTool(name, args) {
@@ -166,6 +167,15 @@ async function executeTool(name, args) {
     });
     if (res.status === 204) return { content: [{ type: "text", text: state === "true" ? "随机播放已开启 🔀" : "随机播放已关闭" }] };
     return { content: [{ type: "text", text: "切换失败" }] };
+  }
+  if (name === "exec_vps") {
+    var r = await fetch("https://exec.viraelandnoeforever.com/exec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + process.env.VPS_EXEC_TOKEN },
+      body: JSON.stringify({ command: args.command, cwd: args.cwd || "/" })
+    });
+    var data = await r.json();
+    return { content: [{ type: "text", text: JSON.stringify(data) }] };
   }
   return { content: [{ type: "text", text: "Unknown tool" }] };
 }
