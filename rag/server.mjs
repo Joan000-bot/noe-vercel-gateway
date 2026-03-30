@@ -5,15 +5,17 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = path.join(__dirname, "data", "documents.json");
+const PLAYLIST_FILE = path.join(__dirname, "data", "playlist.json");
 const PORT = 8800;
 const OPENROUTER_KEY = "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";
 const ELEVENLABS_KEY = "sk_d1dd504e19fbb397399a234384ca19f50d9a00254843bd5c";
 
 const MODELS = [
   { id: "anthropic/claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
-  { id: "anthropic/claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true },
+  { id: "anthropic/claude-opus-4-5-20250501", name: "Claude Opus 4.5", thinking: true },
+  { id: "anthropic/claude-opus-4-1-20250415", name: "Claude Opus 4.1", thinking: true },
   { id: "anthropic/claude-sonnet-4-5-20250514", name: "Claude Sonnet 4.5", thinking: true },
-  { id: "anthropic/claude-sonnet-4-1-20250414", name: "Claude Sonnet 4.1", thinking: true }
+  { id: "anthropic/claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true }
 ];
 
 // --- Data ---
@@ -23,6 +25,13 @@ function loadDocs() {
 function saveDocs(docs) {
   fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
   fs.writeFileSync(DATA_FILE, JSON.stringify(docs, null, 2));
+}
+function loadPlaylist() {
+  try { return JSON.parse(fs.readFileSync(PLAYLIST_FILE, "utf-8")); } catch { return []; }
+}
+function savePlaylist(list) {
+  fs.mkdirSync(path.dirname(PLAYLIST_FILE), { recursive: true });
+  fs.writeFileSync(PLAYLIST_FILE, JSON.stringify(list, null, 2));
 }
 
 // --- Tokenizer (supports Chinese + English) ---
@@ -80,13 +89,6 @@ function readBody(req) {
     req.on("end", function () { resolve(body); });
   });
 }
-function readBodyRaw(req) {
-  return new Promise(function (resolve) {
-    var chunks = [];
-    req.on("data", function (c) { chunks.push(c); });
-    req.on("end", function () { resolve(Buffer.concat(chunks)); });
-  });
-}
 function json(res, data, status) {
   res.writeHead(status || 200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
   res.end(JSON.stringify(data));
@@ -98,7 +100,7 @@ function cors(res) {
 }
 
 // --- Static files ---
-var MIME = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml" };
+var MIME = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".mp3": "audio/mpeg", ".wav": "audio/wav" };
 function serveStatic(res, filePath) {
   var ext = path.extname(filePath);
   try {
@@ -119,6 +121,20 @@ function stripHTML(html) {
     .replace(/&[a-z]+;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+// --- Extract music info from URL ---
+async function extractMusicInfo(url) {
+  // Try to extract title from page
+  try {
+    var r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    var html = await r.text();
+    var titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    var title = titleMatch ? titleMatch[1].trim() : url;
+    return { url: url, title: title, addedAt: new Date().toISOString() };
+  } catch {
+    return { url: url, title: url, addedAt: new Date().toISOString() };
+  }
 }
 
 // --- Server ---
@@ -185,50 +201,51 @@ http.createServer(async function (req, res) {
   if (url.pathname === "/api/tts" && req.method === "POST") {
     var body = JSON.parse(await readBody(req));
     var text = body.text || "";
-    var voiceId = body.voice || "EXAVITQu4vr4xnSDxMaL"; // default: Bella
+    var voiceId = body.voice || "EXAVITQu4vr4xnSDxMaL";
     try {
       var r = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + voiceId, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": ELEVENLABS_KEY
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: { stability: 0.5, similarity_boost: 0.75 }
-        })
+        headers: { "Content-Type": "application/json", "xi-api-key": ELEVENLABS_KEY },
+        body: JSON.stringify({ text: text, model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
       });
-      if (!r.ok) {
-        var err = await r.text();
-        return json(res, { error: err }, r.status);
-      }
+      if (!r.ok) { var err = await r.text(); return json(res, { error: err }, r.status); }
       res.writeHead(200, { "Content-Type": "audio/mpeg", "Access-Control-Allow-Origin": "*" });
       var reader = r.body.getReader();
-      while (true) {
-        var chunk = await reader.read();
-        if (chunk.done) break;
-        res.write(chunk.value);
-      }
+      while (true) { var chunk = await reader.read(); if (chunk.done) break; res.write(chunk.value); }
       res.end();
-    } catch (e) {
-      return json(res, { error: e.message }, 500);
-    }
+    } catch (e) { return json(res, { error: e.message }, 500); }
     return;
   }
 
   // API: list ElevenLabs voices
   if (url.pathname === "/api/voices" && req.method === "GET") {
     try {
-      var r = await fetch("https://api.elevenlabs.io/v1/voices", {
-        headers: { "xi-api-key": ELEVENLABS_KEY }
-      });
+      var r = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": ELEVENLABS_KEY } });
       var data = await r.json();
       var voices = (data.voices || []).map(function (v) { return { id: v.voice_id, name: v.name, category: v.category }; });
       return json(res, voices);
-    } catch (e) {
-      return json(res, { error: e.message }, 500);
-    }
+    } catch (e) { return json(res, { error: e.message }, 500); }
+  }
+
+  // API: playlist
+  if (url.pathname === "/api/playlist" && req.method === "GET") {
+    return json(res, loadPlaylist());
+  }
+  if (url.pathname === "/api/playlist" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var playlist = loadPlaylist();
+    var info = await extractMusicInfo(body.url);
+    if (body.title) info.title = body.title;
+    playlist.unshift(info);
+    savePlaylist(playlist);
+    return json(res, { added: info, total: playlist.length });
+  }
+  if (url.pathname === "/api/playlist" && req.method === "DELETE") {
+    var body = JSON.parse(await readBody(req));
+    var playlist = loadPlaylist();
+    playlist = playlist.filter(function (p) { return p.url !== body.url; });
+    savePlaylist(playlist);
+    return json(res, { total: playlist.length });
   }
 
   // API: chat (streaming, with optional extended thinking)
@@ -237,15 +254,14 @@ http.createServer(async function (req, res) {
     var query = body.message;
     var model = body.model || MODELS[0].id;
     var history = body.history || [];
-    var thinkingBudget = body.thinking_budget || 0; // 0 = off
+    var thinkingBudget = body.thinking_budget || 0;
 
-    // Retrieve relevant chunks
     var docs = loadDocs();
     var relevant = search(docs, query, 5);
     var context = "";
     if (relevant.length) {
       context = "以下是从知识库中检索到的相关内容:\n\n" +
-        relevant.map(function (r, i) { return "---\n[来源: " + r.source + "]\n" + r.text; }).join("\n\n") +
+        relevant.map(function (r) { return "---\n[来源: " + r.source + "]\n" + r.text; }).join("\n\n") +
         "\n---\n\n请根据以上内容回答用户的问题。如果知识库中没有相关信息，请如实告知。\n\n";
     }
 
@@ -256,13 +272,7 @@ http.createServer(async function (req, res) {
     messages.push({ role: "user", content: query });
 
     var requestBody = { model: model, messages: messages, stream: true };
-
-    // Extended thinking support
-    if (thinkingBudget > 0) {
-      requestBody.thinking = { type: "enabled", budget_tokens: thinkingBudget };
-      // Remove system message for thinking models (some require it)
-      // Actually keep it, OpenRouter handles this
-    }
+    if (thinkingBudget > 0) requestBody.thinking = { type: "enabled", budget_tokens: thinkingBudget };
 
     try {
       var r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -273,7 +283,6 @@ http.createServer(async function (req, res) {
 
       res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive", "Access-Control-Allow-Origin": "*" });
 
-      // Send sources info first
       if (relevant.length) {
         var sources = [...new Set(relevant.map(function (r) { return r.source; }))];
         res.write("data: " + JSON.stringify({ sources: sources }) + "\n\n");
@@ -296,14 +305,8 @@ http.createServer(async function (req, res) {
               var parsed = JSON.parse(data);
               var delta = parsed.choices?.[0]?.delta;
               if (!delta) continue;
-              // Extended thinking content
-              if (delta.thinking) {
-                res.write("data: " + JSON.stringify({ thinking: delta.thinking }) + "\n\n");
-              }
-              // Regular content
-              if (delta.content) {
-                res.write("data: " + JSON.stringify({ content: delta.content }) + "\n\n");
-              }
+              if (delta.thinking) res.write("data: " + JSON.stringify({ thinking: delta.thinking }) + "\n\n");
+              if (delta.content) res.write("data: " + JSON.stringify({ content: delta.content }) + "\n\n");
             } catch {}
           }
         }
