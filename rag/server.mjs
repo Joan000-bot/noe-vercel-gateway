@@ -377,6 +377,19 @@ http.createServer(async function (req, res) {
     return json(res, { ok: true });
   }
 
+  // API: phone status
+  if (url.pathname === "/api/phone" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var logs = loadJSON("phone");
+    logs.unshift({ time: new Date().toISOString(), battery: body.battery, charging: body.charging, wifi: body.wifi, app: body.app, note: body.note, location: body.location });
+    if (logs.length > 500) logs = logs.slice(0, 500);
+    saveJSON("phone", logs);
+    return json(res, { ok: true });
+  }
+  if (url.pathname === "/api/phone" && req.method === "GET") {
+    return json(res, loadJSON("phone").slice(0, 50));
+  }
+
   // API: auth
   if (url.pathname === "/api/login" && req.method === "POST") {
     var body = JSON.parse(await readBody(req));

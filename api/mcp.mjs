@@ -32,7 +32,8 @@ var tools = [
   { name: "skip_to_previous", description: "上一首", inputSchema: { type: "object", properties: {} } },
   { name: "set_volume", description: "调整音量（0-100）", inputSchema: { type: "object", properties: { volume: { type: "number" } }, required: ["volume"] } },
   { name: "shuffle_playback", description: "切换随机播放", inputSchema: { type: "object", properties: { state: { type: "boolean" } }, required: ["state"] } },
-  { name: "exec_vps", description: "在VPS上执行命令", inputSchema: { type: "object", properties: { command: { type: "string", description: "要执行的命令" }, cwd: { type: "string", description: "工作目录" } }, required: ["command"] } }
+  { name: "exec_vps", description: "在VPS上执行命令", inputSchema: { type: "object", properties: { command: { type: "string", description: "要执行的命令" }, cwd: { type: "string", description: "工作目录" } }, required: ["command"] } },
+  { name: "get_phone_status", description: "查看Virael的手机使用情况（电量、WiFi、正在用的app等）", inputSchema: { type: "object", properties: { limit: { type: "number", description: "返回最近几条记录，默认5" } } } }
 ];
 
 async function executeTool(name, args) {
@@ -178,6 +179,23 @@ async function executeTool(name, args) {
     if (!r.ok) return { content: [{ type: "text", text: "Error " + r.status + ": " + text }] };
     try { var data = JSON.parse(text); return { content: [{ type: "text", text: JSON.stringify(data) }] }; }
     catch { return { content: [{ type: "text", text: text }] }; }
+  }
+  if (name === "get_phone_status") {
+    var limit = args.limit || 5;
+    var r = await fetch("https://chat.viraelandnoeforever.com/api/phone");
+    var data = await r.json();
+    var recent = data.slice(0, limit);
+    if (!recent.length) return { content: [{ type: "text", text: "暂无手机状态数据。Virael需要在iPhone上设置快捷指令来上报数据。" }] };
+    var text = recent.map(function(s) {
+      var parts = [s.time.replace("T", " ").slice(0, 19)];
+      if (s.battery) parts.push("电量: " + s.battery + "%" + (s.charging ? " ⚡充电中" : ""));
+      if (s.wifi) parts.push("WiFi: " + s.wifi);
+      if (s.app) parts.push("正在用: " + s.app);
+      if (s.note) parts.push("备注: " + s.note);
+      if (s.location) parts.push("位置: " + s.location);
+      return parts.join(" | ");
+    }).join("\n");
+    return { content: [{ type: "text", text: text }] };
   }
   return { content: [{ type: "text", text: "Unknown tool" }] };
 }
