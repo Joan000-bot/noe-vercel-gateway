@@ -139,12 +139,15 @@ http.createServer(async (req, res) => {
       context = await b.newContext({ viewport: { width: 1280, height: 720 }, locale: "en-US" });
       page = await context.newPage();
 
-      await page.goto("https://x.com/i/flow/login", { waitUntil: "networkidle", timeout: 30000 });
-      await page.waitForTimeout(5000);
+      await page.goto("https://x.com/i/flow/login", { waitUntil: "networkidle", timeout: 40000 });
+
+      // Wait for the login form to render (X is heavy SPA)
+      await page.waitForSelector('input', { timeout: 20000 });
+      await page.waitForTimeout(2000);
 
       // Enter username - try multiple selectors
       var usernameInput = page.locator('input[name="text"], input[autocomplete="username"], input[type="text"]').first();
-      await usernameInput.waitFor({ timeout: 15000 });
+      await usernameInput.waitFor({ timeout: 10000 });
       await usernameInput.fill(X_USER);
       await page.waitForTimeout(1000);
 
