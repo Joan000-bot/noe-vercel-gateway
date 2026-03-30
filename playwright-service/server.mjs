@@ -139,18 +139,30 @@ http.createServer(async (req, res) => {
       context = await b.newContext({ viewport: { width: 1280, height: 720 }, locale: "en-US" });
       page = await context.newPage();
 
-      await page.goto("https://x.com/i/flow/login", { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.goto("https://x.com/i/flow/login", { waitUntil: "networkidle", timeout: 30000 });
+      await page.waitForTimeout(5000);
+
+      // Enter username - try multiple selectors
+      var usernameInput = page.locator('input[name="text"], input[autocomplete="username"], input[type="text"]').first();
+      await usernameInput.waitFor({ timeout: 15000 });
+      await usernameInput.fill(X_USER);
+      await page.waitForTimeout(1000);
+
+      // Click Next
+      var nextBtn = page.locator('button:has-text("Next"), button:has-text("下一步"), [role="button"]:has-text("Next")').first();
+      await nextBtn.click();
       await page.waitForTimeout(3000);
 
-      // Enter username
-      await page.fill('input[autocomplete="username"]', X_USER);
-      await page.click('button:has-text("Next")');
-      await page.waitForTimeout(2000);
-
       // Enter password
-      await page.fill('input[type="password"]', X_PASS);
-      await page.click('button:has-text("Log in")');
-      await page.waitForTimeout(5000);
+      var pwInput = page.locator('input[type="password"], input[name="password"]').first();
+      await pwInput.waitFor({ timeout: 10000 });
+      await pwInput.fill(X_PASS);
+      await page.waitForTimeout(1000);
+
+      // Click Log in
+      var loginBtn = page.locator('button:has-text("Log in"), button:has-text("登录"), [data-testid="LoginForm_Login_Button"]').first();
+      await loginBtn.click();
+      await page.waitForTimeout(6000);
 
       // Check if logged in
       var currentUrl = page.url();
