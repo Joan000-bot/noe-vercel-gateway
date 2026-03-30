@@ -6,28 +6,53 @@
 <title>Noe</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-:root { --bg: #0a0a0a; --surface: #141414; --surface2: #1e1e1e; --border: #2a2a2a; --text: #e8e8e8; --text2: #888; --accent: #c4a0ff; --accent2: #a07ae0; }
+:root { --bg: #0a0a0a; --surface: #141414; --surface2: #1e1e1e; --border: #2a2a2a; --text: #e8e8e8; --text2: #888; --accent: #c4a0ff; --accent2: #a07ae0; --think: #2a2a1e; --think-border: #4a4a2e; }
 body { font-family: -apple-system, "SF Pro", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; }
 
 /* Sidebar */
-.sidebar { width: 280px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
-.sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); }
-.sidebar-header h2 { font-size: 14px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-.model-select { width: 100%; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; cursor: pointer; outline: none; }
-.model-select:focus { border-color: var(--accent); }
-.doc-list { flex: 1; overflow-y: auto; padding: 12px; }
-.doc-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--surface2); border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+.sidebar { width: 300px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+.sidebar-section { padding: 16px; border-bottom: 1px solid var(--border); }
+.sidebar-section h2 { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.model-select, .voice-select { width: 100%; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; cursor: pointer; outline: none; }
+.model-select:focus, .voice-select:focus { border-color: var(--accent); }
+
+/* Thinking slider */
+.slider-wrap { margin-top: 10px; }
+.slider-wrap label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+.slider-wrap label span { color: var(--accent); font-weight: 600; }
+input[type="range"] { width: 100%; -webkit-appearance: none; height: 4px; background: var(--border); border-radius: 2px; outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; }
+
+/* Voice controls */
+.voice-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.voice-row .voice-select { flex: 1; }
+.voice-toggle { padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); font-size: 18px; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+.voice-toggle.active { border-color: var(--accent); color: var(--accent); background: rgba(192,160,255,0.1); }
+
+/* Auto message */
+.auto-msg { display: flex; gap: 8px; align-items: center; }
+.auto-msg input { flex: 1; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; }
+.auto-msg input:focus { border-color: var(--accent); }
+.auto-msg select { padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; outline: none; }
+.auto-btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; margin-top: 8px; transition: all 0.2s; }
+.auto-btn.running { border-color: #f66; color: #f66; }
+.auto-btn:hover { border-color: var(--accent); color: var(--accent); }
+.auto-status { font-size: 11px; color: var(--text2); margin-top: 6px; }
+
+/* Doc list */
+.doc-list { max-height: 200px; overflow-y: auto; }
+.doc-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--surface2); border-radius: 8px; margin-bottom: 6px; font-size: 12px; }
 .doc-item .source { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text2); }
 .doc-item .chunks { color: var(--accent); font-size: 11px; margin: 0 8px; flex-shrink: 0; }
-.doc-item .del { background: none; border: none; color: #666; cursor: pointer; font-size: 16px; padding: 0 4px; }
+.doc-item .del { background: none; border: none; color: #666; cursor: pointer; font-size: 14px; padding: 0 4px; }
 .doc-item .del:hover { color: #f66; }
-.doc-actions { padding: 12px; border-top: 1px solid var(--border); }
-.doc-actions button { width: 100%; padding: 10px; margin-bottom: 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; cursor: pointer; transition: all 0.2s; }
+.doc-actions { display: flex; gap: 6px; }
+.doc-actions button { flex: 1; padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; cursor: pointer; transition: all 0.2s; }
 .doc-actions button:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Chat */
-.chat-area { flex: 1; display: flex; flex-direction: column; }
-.chat-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+.chat-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.chat-header { padding: 14px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
 .chat-header .logo { font-size: 20px; font-weight: 700; color: var(--accent); }
 .chat-header .status { font-size: 12px; color: var(--text2); }
 .messages { flex: 1; overflow-y: auto; padding: 24px; }
@@ -35,11 +60,15 @@ body { font-family: -apple-system, "SF Pro", "Helvetica Neue", sans-serif; backg
 .message.user { display: flex; justify-content: flex-end; }
 .message.user .bubble { background: var(--accent2); color: #fff; border-radius: 18px 18px 4px 18px; padding: 12px 18px; max-width: 70%; }
 .message.assistant .bubble { background: var(--surface2); border-radius: 18px 18px 18px 4px; padding: 16px 20px; line-height: 1.7; max-width: 85%; }
+.message .thinking-block { background: var(--think); border: 1px solid var(--think-border); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; font-size: 12px; color: #b0a870; line-height: 1.6; max-height: 200px; overflow-y: auto; cursor: pointer; position: relative; }
+.message .thinking-block.collapsed { max-height: 40px; overflow: hidden; }
+.message .thinking-block::before { content: "Thinking..."; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #8a8050; display: block; margin-bottom: 4px; }
+.message .thinking-block.collapsed::after { content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 20px; background: linear-gradient(transparent, var(--think)); }
 .message .sources { font-size: 11px; color: var(--text2); margin-top: 8px; padding: 8px 12px; background: var(--surface); border-radius: 8px; }
 .message .sources span { color: var(--accent); }
-.typing { display: inline-block; }
-.typing::after { content: ""; animation: blink 1s infinite; }
-@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+.message .voice-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: var(--text2); cursor: pointer; margin-top: 6px; transition: all 0.2s; }
+.message .voice-btn:hover { border-color: var(--accent); color: var(--accent); }
+.message .voice-btn.playing { border-color: var(--accent); color: var(--accent); }
 
 /* Input */
 .input-area { padding: 16px 24px; border-top: 1px solid var(--border); }
@@ -77,15 +106,51 @@ body { font-family: -apple-system, "SF Pro", "Helvetica Neue", sans-serif; backg
 <body>
 
 <div class="sidebar">
-  <div class="sidebar-header">
+  <!-- Model & Thinking -->
+  <div class="sidebar-section">
     <h2>Model</h2>
     <select class="model-select" id="modelSelect"></select>
-    <h2 style="margin-top:16px">Knowledge Base</h2>
+    <div class="slider-wrap">
+      <label>Thinking <span id="thinkingLabel">Off</span></label>
+      <input type="range" id="thinkingSlider" min="0" max="32000" step="1000" value="0" oninput="updateThinkingLabel()">
+    </div>
   </div>
-  <div class="doc-list" id="docList"></div>
-  <div class="doc-actions">
-    <button onclick="showModal('text')">+ Add Text</button>
-    <button onclick="showModal('url')">+ Add URL</button>
+
+  <!-- Voice -->
+  <div class="sidebar-section">
+    <h2>Voice</h2>
+    <div class="voice-row">
+      <select class="voice-select" id="voiceSelect"><option value="">Loading voices...</option></select>
+      <button class="voice-toggle" id="voiceToggle" onclick="toggleVoice()" title="Auto-read responses">&#9834;</button>
+    </div>
+  </div>
+
+  <!-- Auto Message -->
+  <div class="sidebar-section">
+    <h2>Auto Message</h2>
+    <div class="auto-msg">
+      <input id="autoMsg" placeholder="Message to auto-send...">
+      <select id="autoInterval">
+        <option value="30">30s</option>
+        <option value="60" selected>1m</option>
+        <option value="300">5m</option>
+        <option value="600">10m</option>
+        <option value="1800">30m</option>
+        <option value="3600">1h</option>
+      </select>
+    </div>
+    <button class="auto-btn" id="autoBtn" onclick="toggleAuto()">Start Auto</button>
+    <div class="auto-status" id="autoStatus"></div>
+  </div>
+
+  <!-- Knowledge Base -->
+  <div class="sidebar-section" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+    <h2>Knowledge Base</h2>
+    <div class="doc-list" id="docList"></div>
+    <div class="doc-actions" style="margin-top:8px;">
+      <button onclick="showModal('text')">+ Text</button>
+      <button onclick="showModal('url')">+ URL</button>
+    </div>
   </div>
 </div>
 
@@ -107,7 +172,7 @@ body { font-family: -apple-system, "SF Pro", "Helvetica Neue", sans-serif; backg
 <div class="modal-overlay" id="textModal">
   <div class="modal">
     <h3>Add Text Document</h3>
-    <input id="textSource" placeholder="Document name (e.g. notes.txt)">
+    <input id="textSource" placeholder="Document name">
     <textarea id="textContent" placeholder="Paste your text here..."></textarea>
     <div class="modal-btns">
       <button onclick="closeModals()">Cancel</button>
@@ -132,20 +197,107 @@ body { font-family: -apple-system, "SF Pro", "Helvetica Neue", sans-serif; backg
 var API = window.location.origin;
 var history = [];
 var sending = false;
+var autoTimer = null;
+var voiceEnabled = false;
+var currentAudio = null;
 
-// Init
+// --- Init ---
 async function init() {
   var r = await fetch(API + "/api/models");
   var models = await r.json();
   var sel = document.getElementById("modelSelect");
+  sel.innerHTML = "";
   models.forEach(function(m) {
     var opt = document.createElement("option");
     opt.value = m.id; opt.textContent = m.name;
     sel.appendChild(opt);
   });
   loadDocs();
+  loadVoices();
 }
 
+// --- Thinking ---
+function updateThinkingLabel() {
+  var val = parseInt(document.getElementById("thinkingSlider").value);
+  var label = document.getElementById("thinkingLabel");
+  if (val === 0) label.textContent = "Off";
+  else if (val < 1000) label.textContent = val + " tokens";
+  else label.textContent = (val / 1000) + "k tokens";
+}
+
+// --- Voice ---
+async function loadVoices() {
+  try {
+    var r = await fetch(API + "/api/voices");
+    var voices = await r.json();
+    var sel = document.getElementById("voiceSelect");
+    sel.innerHTML = "";
+    voices.forEach(function(v) {
+      var opt = document.createElement("option");
+      opt.value = v.id; opt.textContent = v.name + (v.category ? " (" + v.category + ")" : "");
+      sel.appendChild(opt);
+    });
+  } catch {}
+}
+
+function toggleVoice() {
+  voiceEnabled = !voiceEnabled;
+  document.getElementById("voiceToggle").classList.toggle("active", voiceEnabled);
+}
+
+async function playTTS(text, btn) {
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  if (btn) btn.classList.add("playing");
+  try {
+    var voiceId = document.getElementById("voiceSelect").value;
+    var r = await fetch(API + "/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text.slice(0, 5000), voice: voiceId })
+    });
+    var blob = await r.blob();
+    var url = URL.createObjectURL(blob);
+    currentAudio = new Audio(url);
+    currentAudio.onended = function() { if (btn) btn.classList.remove("playing"); currentAudio = null; };
+    currentAudio.play();
+  } catch { if (btn) btn.classList.remove("playing"); }
+}
+
+// --- Auto Message ---
+function toggleAuto() {
+  var btn = document.getElementById("autoBtn");
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    btn.textContent = "Start Auto";
+    btn.classList.remove("running");
+    document.getElementById("autoStatus").textContent = "";
+    return;
+  }
+  var msg = document.getElementById("autoMsg").value.trim();
+  if (!msg) { document.getElementById("autoStatus").textContent = "Please enter a message"; return; }
+  var interval = parseInt(document.getElementById("autoInterval").value) * 1000;
+  btn.textContent = "Stop Auto";
+  btn.classList.add("running");
+  // Send immediately first
+  sendAutoMessage(msg);
+  autoTimer = setInterval(function() { sendAutoMessage(msg); }, interval);
+  updateAutoStatus();
+}
+
+function sendAutoMessage(msg) {
+  if (sending) return;
+  document.getElementById("input").value = msg;
+  send();
+}
+
+function updateAutoStatus() {
+  if (!autoTimer) return;
+  var interval = document.getElementById("autoInterval").value;
+  document.getElementById("autoStatus").textContent = "Running every " + (interval >= 60 ? (interval/60) + "m" : interval + "s");
+}
+
+// --- Documents ---
 async function loadDocs() {
   var r = await fetch(API + "/api/documents");
   var docs = await r.json();
@@ -154,7 +306,7 @@ async function loadDocs() {
   docs.forEach(function(d) {
     var div = document.createElement("div");
     div.className = "doc-item";
-    div.innerHTML = '<span class="source" title="' + d.source + '">' + d.source + '</span><span class="chunks">' + d.chunks + ' chunks</span><button class="del" onclick="delDoc(\'' + d.source.replace(/'/g, "\\'") + '\')">&times;</button>';
+    div.innerHTML = '<span class="source" title="' + d.source + '">' + d.source + '</span><span class="chunks">' + d.chunks + '</span><button class="del" onclick="delDoc(\'' + d.source.replace(/'/g, "\\'") + '\')">&times;</button>';
     list.appendChild(div);
   });
 }
@@ -179,8 +331,7 @@ async function addText() {
   await fetch(API + "/api/documents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: source, text: text }) });
   document.getElementById("textSource").value = "";
   document.getElementById("textContent").value = "";
-  closeModals();
-  loadDocs();
+  closeModals(); loadDocs();
 }
 
 async function addUrl() {
@@ -190,28 +341,10 @@ async function addUrl() {
   await fetch(API + "/api/documents/url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: url }) });
   document.getElementById("urlInput").value = "";
   document.getElementById("status").textContent = "Ready";
-  closeModals();
-  loadDocs();
+  closeModals(); loadDocs();
 }
 
-function addMessage(role, content, sources) {
-  var div = document.createElement("div");
-  div.className = "message " + role;
-  var bubble = document.createElement("div");
-  bubble.className = "bubble";
-  bubble.innerHTML = renderMarkdown(content);
-  div.appendChild(bubble);
-  if (sources && sources.length) {
-    var s = document.createElement("div");
-    s.className = "sources";
-    s.innerHTML = "References: " + sources.map(function(src) { return '<span>' + src + '</span>'; }).join(", ");
-    div.appendChild(s);
-  }
-  document.getElementById("messages").appendChild(div);
-  document.getElementById("messages").scrollTop = 999999;
-  return bubble;
-}
-
+// --- Chat ---
 function renderMarkdown(text) {
   return text
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -219,6 +352,18 @@ function renderMarkdown(text) {
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\n/g, "<br>");
+}
+
+function addMessage(role, content) {
+  var div = document.createElement("div");
+  div.className = "message " + role;
+  var bubble = document.createElement("div");
+  bubble.className = "bubble";
+  if (content) bubble.innerHTML = renderMarkdown(content);
+  div.appendChild(bubble);
+  document.getElementById("messages").appendChild(div);
+  document.getElementById("messages").scrollTop = 999999;
+  return div;
 }
 
 async function send() {
@@ -236,15 +381,25 @@ async function send() {
   document.getElementById("sendBtn").disabled = true;
   document.getElementById("status").textContent = "Thinking...";
 
-  var bubble = addMessage("assistant", "");
+  var msgDiv = addMessage("assistant", "");
+  var bubble = msgDiv.querySelector(".bubble");
+  var thinkingBlock = null;
   var fullText = "";
+  var thinkingText = "";
   var sources = [];
+
+  var thinkingBudget = parseInt(document.getElementById("thinkingSlider").value);
 
   try {
     var r = await fetch(API + "/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: msg, model: document.getElementById("modelSelect").value, history: history.slice(-20) })
+      body: JSON.stringify({
+        message: msg,
+        model: document.getElementById("modelSelect").value,
+        history: history.slice(-20),
+        thinking_budget: thinkingBudget
+      })
     });
 
     var reader = r.body.getReader();
@@ -264,20 +419,50 @@ async function send() {
         try {
           var parsed = JSON.parse(data);
           if (parsed.sources) { sources = parsed.sources; continue; }
+          if (parsed.thinking) {
+            if (!thinkingBlock) {
+              thinkingBlock = document.createElement("div");
+              thinkingBlock.className = "thinking-block";
+              thinkingBlock.onclick = function() { this.classList.toggle("collapsed"); };
+              msgDiv.insertBefore(thinkingBlock, bubble);
+            }
+            thinkingText += parsed.thinking;
+            thinkingBlock.innerHTML = "<span></span>" + renderMarkdown(thinkingText);
+            document.getElementById("status").textContent = "Thinking... (" + thinkingText.length + " chars)";
+          }
           if (parsed.content) {
             fullText += parsed.content;
             bubble.innerHTML = renderMarkdown(fullText);
-            document.getElementById("messages").scrollTop = 999999;
+            if (thinkingBlock && document.getElementById("status").textContent.startsWith("Thinking")) {
+              document.getElementById("status").textContent = "Writing...";
+            }
           }
+          document.getElementById("messages").scrollTop = 999999;
         } catch {}
       }
     }
 
+    // Collapse thinking by default
+    if (thinkingBlock) thinkingBlock.classList.add("collapsed");
+
+    // Sources
     if (sources.length) {
       var s = document.createElement("div");
       s.className = "sources";
       s.innerHTML = "References: " + sources.map(function(src) { return '<span>' + src + '</span>'; }).join(", ");
-      bubble.parentElement.appendChild(s);
+      msgDiv.appendChild(s);
+    }
+
+    // Voice button
+    if (fullText) {
+      var vbtn = document.createElement("button");
+      vbtn.className = "voice-btn";
+      vbtn.textContent = "Play voice";
+      vbtn.onclick = function() { playTTS(fullText, vbtn); };
+      msgDiv.appendChild(vbtn);
+
+      // Auto-play if voice enabled
+      if (voiceEnabled) playTTS(fullText);
     }
 
     history.push({ role: "assistant", content: fullText });
