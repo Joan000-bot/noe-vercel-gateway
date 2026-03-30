@@ -192,7 +192,6 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
   <div class="ss">
     <h2>Model</h2>
     <select id="modelSelect"></select>
-    <div class="slider-wrap"><label>Thinking <span id="thinkingLabel">Off</span></label><input type="range" id="thinkingSlider" min="0" max="32000" step="1000" value="0" oninput="updateThinkingLabel()"></div>
   </div>
   <div class="ss">
     <h2>Theme</h2>
@@ -213,11 +212,6 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
   <div class="ss">
     <h2>Voice</h2>
     <div class="voice-row"><select id="voiceSelect"><option value="">Loading...</option></select><button class="icon-btn" id="voiceToggle" onclick="toggleVoice()" title="Auto-read">&#9834;</button></div>
-  </div>
-  <div class="ss">
-    <h2>Auto Message</h2>
-    <div class="auto-row"><input type="text" id="autoMsg" placeholder="Message..."><select id="autoInterval"><option value="30">30s</option><option value="60" selected>1m</option><option value="300">5m</option><option value="600">10m</option></select></div>
-    <button class="auto-btn" id="autoBtn" onclick="toggleAuto()">Start</button><div class="auto-status" id="autoStatus"></div>
   </div>
   <div class="ss" style="flex:1;display:flex;flex-direction:column;min-height:0">
     <h2>Knowledge Base</h2>
@@ -295,6 +289,18 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
       <input type="range" id="tempSlider" min="0" max="100" value="70" style="flex:1">
       <span style="font-size:11px;color:var(--accent)" id="tempLabel">0.7</span>
     </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Thinking Budget</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <input type="range" id="thinkingSlider" min="0" max="32000" step="1000" value="0" style="flex:1" oninput="updateThinkingLabel()">
+      <span style="font-size:11px;color:var(--accent)" id="thinkingLabel">Off</span>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Auto Message</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input type="text" id="autoMsg" placeholder="Message to auto-send..." style="flex:1;margin-bottom:0">
+      <select id="autoInterval" style="width:65px;margin-bottom:0"><option value="30">30s</option><option value="60" selected>1m</option><option value="300">5m</option><option value="600">10m</option><option value="3600">1h</option></select>
+    </div>
+    <button class="auto-btn" id="autoBtn" onclick="toggleAuto()" style="margin-bottom:10px">Start Auto</button>
+    <div class="auto-status" id="autoStatus"></div>
     <div class="modal-btns">
       <button onclick="closeModals()">Cancel</button>
       <button class="primary" onclick="savePromptSettings()">Save</button>
