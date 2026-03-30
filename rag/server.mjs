@@ -330,6 +330,53 @@ http.createServer(async function (req, res) {
     return;
   }
 
+  // API: conversations
+  if (url.pathname === "/api/conversations" && req.method === "GET") {
+    var convos = loadJSON("conversations");
+    // Return list without messages (lighter)
+    return json(res, convos.map(function(c) { return { id: c.id, name: c.name, date: c.date, updatedAt: c.updatedAt, msgCount: (c.messages || []).length }; }));
+  }
+  if (url.pathname === "/api/conversations/new" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var convos = loadJSON("conversations");
+    var id = Date.now().toString(36);
+    convos.unshift({ id: id, name: body.name || "New Chat", date: new Date().toISOString().slice(0, 10), messages: [], updatedAt: new Date().toISOString() });
+    saveJSON("conversations", convos);
+    return json(res, { id: id });
+  }
+  if (url.pathname === "/api/conversations/get" && req.method === "GET") {
+    var id = url.searchParams.get("id");
+    var convos = loadJSON("conversations");
+    var c = convos.find(function(x) { return x.id === id; });
+    return json(res, c || { messages: [] });
+  }
+  if (url.pathname === "/api/conversations/save" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var convos = loadJSON("conversations");
+    var c = convos.find(function(x) { return x.id === body.id; });
+    if (c) {
+      c.messages = body.messages || [];
+      c.updatedAt = new Date().toISOString();
+      if (body.name) c.name = body.name;
+    }
+    saveJSON("conversations", convos);
+    return json(res, { ok: true });
+  }
+  if (url.pathname === "/api/conversations/rename" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var convos = loadJSON("conversations");
+    var c = convos.find(function(x) { return x.id === body.id; });
+    if (c) c.name = body.name;
+    saveJSON("conversations", convos);
+    return json(res, { ok: true });
+  }
+  if (url.pathname === "/api/conversations/delete" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var convos = loadJSON("conversations").filter(function(x) { return x.id !== body.id; });
+    saveJSON("conversations", convos);
+    return json(res, { ok: true });
+  }
+
   // API: auth
   if (url.pathname === "/api/login" && req.method === "POST") {
     var body = JSON.parse(await readBody(req));
