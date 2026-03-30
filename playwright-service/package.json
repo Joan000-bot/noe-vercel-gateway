@@ -1,0 +1,7 @@
+{
+  "name": "playwright-service",
+  "private": true,
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}
