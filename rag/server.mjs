@@ -14,6 +14,7 @@ const LOGIN_PASSWORD = "viraelnoe";
 function loadJSON(name) { try { return JSON.parse(fs.readFileSync(path.join(DATA_DIR, name + ".json"), "utf-8")); } catch { return []; } }
 function saveJSON(name, data) { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(path.join(DATA_DIR, name + ".json"), JSON.stringify(data, null, 2)); }
 const OPENROUTER_KEY = process.env.OPENROUTER_KEY || (() => { try { return fs.readFileSync("/root/openrouter-key.txt", "utf-8").trim(); } catch { return ""; } })();
+const AI_PROXY = "https://noe-vercel-gateway.vercel.app/api/ai-proxy";
 const ELEVENLABS_KEY = process.env.ELEVENLABS_KEY || (() => { try { return fs.readFileSync("/root/elevenlabs-key.txt", "utf-8").trim(); } catch { return ""; } })();
 
 const MODELS = [
@@ -285,7 +286,7 @@ http.createServer(async function (req, res) {
     if (thinkingBudget > 0) requestBody.thinking = { type: "enabled", budget_tokens: thinkingBudget };
 
     try {
-      var r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      var r = await fetch(AI_PROXY, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + OPENROUTER_KEY },
         body: JSON.stringify(requestBody)
