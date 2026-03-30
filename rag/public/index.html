@@ -39,9 +39,10 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 .color-row label { font-size: 11px; color: var(--text2); width: 60px; flex-shrink: 0; }
 .color-row input[type="color"] { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; padding: 0; }
 .color-row input[type="range"] { flex: 1; }
-.bg-input { display: flex; gap: 6px; margin-top: 6px; }
-.bg-input input { flex: 1; }
-.bg-input button { padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 11px; cursor: pointer; }
+.bg-input { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+.bg-input input[type="text"] { flex: 1; }
+.bg-input button, .bg-input label { padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 11px; cursor: pointer; text-align: center; }
+.bg-input label:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Voice */
 .voice-row { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
@@ -178,8 +179,13 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
       <span style="font-size:11px;color:var(--text2)" id="alphaLabel">85%</span>
     </div>
     <div class="bg-input">
-      <input type="text" id="chatBgUrl" placeholder="Chat background URL...">
+      <input type="text" id="chatBgUrl" placeholder="Background URL...">
       <button onclick="applyTheme()">Set</button>
+      <label for="chatBgFile">Upload</label>
+      <input type="file" id="chatBgFile" class="hidden" accept="image/*" onchange="uploadChatBg(this)">
+    </div>
+    <div class="bg-input" style="margin-top:4px">
+      <button onclick="clearChatBg()" style="flex:1;font-size:11px">Clear Background</button>
     </div>
   </div>
 
@@ -372,6 +378,22 @@ function applyTheme() {
   else { bgEl.style.backgroundImage = 'none'; }
 
   saveSettings();
+}
+
+// --- Chat background upload ---
+function uploadChatBg(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById("chatBgUrl").value = e.target.result;
+    applyTheme();
+  };
+  reader.readAsDataURL(file);
+}
+function clearChatBg() {
+  document.getElementById("chatBgUrl").value = "";
+  applyTheme();
 }
 
 // --- Avatars ---
