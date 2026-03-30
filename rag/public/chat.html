@@ -171,7 +171,8 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
 .bubble pre code{background:none;padding:0}
 
 /* Conversation panel */
-.conv-panel{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;z-index:2;backdrop-filter:blur(20px)}
+.conv-panel{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;z-index:2;backdrop-filter:blur(20px);transition:margin-left .3s,opacity .3s}
+.conv-panel.collapsed{margin-left:-220px;opacity:0;pointer-events:none}
 .conv-panel.hidden{display:none}
 .conv-header{padding:12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .conv-header h2{font-family:var(--font-display);font-size:13px;color:var(--text2);font-weight:400;letter-spacing:1px}
@@ -244,7 +245,7 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
 
 <!-- CONVERSATIONS -->
 <div class="conv-panel" id="convPanel">
-  <div class="conv-header"><h2>Chats</h2><button class="conv-new" onclick="newConversation()">+ New</button></div>
+  <div class="conv-header"><h2>Chats</h2><div style="display:flex;gap:4px"><button class="conv-new" onclick="newConversation()">+ New</button><button class="conv-new" onclick="toggleConvPanel()" style="background:transparent;border:1px solid var(--border);color:var(--text2)" title="Collapse">&#10094;</button></div></div>
   <div class="conv-list" id="convList"></div>
 </div>
 
@@ -252,6 +253,7 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
 <div class="chat-area">
   <div class="chat-bg" id="chatBg"></div>
   <div class="chat-header">
+    <button id="convOpenBtn" onclick="toggleConvPanel()" style="display:none;background:none;border:1px solid var(--border);border-radius:8px;padding:4px 8px;color:var(--text2);font-size:14px;cursor:pointer;margin-right:8px" title="Show chats">&#10095;</button>
     <div class="logo">Noe</div>
     <div class="header-right">
       <div class="mini-vinyl-wrap" onclick="openMusicPlayer()" title="Listen Together">
@@ -516,6 +518,7 @@ async function addUrl(){var u=document.getElementById("urlInput").value;if(!u)re
 
 // === CONVERSATIONS ===
 var currentConvId=null;
+function toggleConvPanel(){var p=document.getElementById("convPanel"),b=document.getElementById("convOpenBtn");p.classList.toggle("collapsed");var hidden=p.classList.contains("collapsed");b.style.display=hidden?"block":"none"}
 async function loadConversations(){
   var d=await(await fetch(API+"/api/conversations")).json();
   var list=document.getElementById("convList");list.innerHTML="";
