@@ -388,7 +388,11 @@ http.createServer(async function (req, res) {
     var contentType = req.headers["content-type"] || "";
     var note = url.searchParams.get("note") || "screenshot";
 
-    if (contentType.startsWith("image/") || contentType === "application/octet-stream") {
+    // Check if it's raw image data (PNG starts with 0x89504E47)
+    var isPng = buf.length > 4 && buf[0] === 0x89 && buf[1] === 0x50;
+    var isJpg = buf.length > 2 && buf[0] === 0xFF && buf[1] === 0xD8;
+
+    if (contentType.startsWith("image/") || contentType === "application/octet-stream" || isPng || isJpg) {
       // Raw image upload (from Shortcuts)
       fs.writeFileSync(path.join(DATA_DIR, "screenshots", filename), buf);
     } else {
