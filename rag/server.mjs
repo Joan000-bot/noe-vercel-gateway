@@ -13,8 +13,8 @@ const LOGIN_PASSWORD = "viraelnoe";
 // --- Generic JSON store ---
 function loadJSON(name) { try { return JSON.parse(fs.readFileSync(path.join(DATA_DIR, name + ".json"), "utf-8")); } catch { return []; } }
 function saveJSON(name, data) { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(path.join(DATA_DIR, name + ".json"), JSON.stringify(data, null, 2)); }
-const OPENROUTER_KEY = "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";
-const ELEVENLABS_KEY = "sk_d1dd504e19fbb397399a234384ca19f50d9a00254843bd5c";
+const OPENROUTER_KEY = process.env.OPENROUTER_KEY || (() => { try { return fs.readFileSync("/root/openrouter-key.txt", "utf-8").trim(); } catch { return ""; } })();
+const ELEVENLABS_KEY = process.env.ELEVENLABS_KEY || (() => { try { return fs.readFileSync("/root/elevenlabs-key.txt", "utf-8").trim(); } catch { return ""; } })();
 
 const MODELS = [
   { id: "anthropic/claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
