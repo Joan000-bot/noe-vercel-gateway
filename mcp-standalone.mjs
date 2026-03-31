@@ -142,7 +142,7 @@ async function executeTool(name, args) {
   }
   if (name === "read_x_timeline") {
     try {
-      var r = await fetch(PLAYWRIGHT_API_URL + "/x/timeline", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ username: args.username || "", count: Math.min(args.count || 10, 50) }) });
+      var r = await fetch(PLAYWRIGHT_API_URL + "/x/timeline", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ username: args.username || "", count: Math.min(args.count || 10, 100) }) });
       var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法读取: " + data.error }] };
       var tweets = data.data.tweets || []; if (!tweets.length) return { content: [{ type: "text", text: "没有推文" }] };
       return { content: [{ type: "text", text: tweets.map((t, i) => (i + 1) + ". " + t.author + "\n" + t.text + "\n🕐 " + (t.time || "") + (t.url ? "\n🔗 " + t.url : "")).join("\n---\n") }] };

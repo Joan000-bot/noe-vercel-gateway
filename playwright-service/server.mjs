@@ -228,10 +228,15 @@ http.createServer(async (req, res) => {
       await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
       await page.waitForTimeout(4000);
 
-      // Scroll to load more tweets based on count
-      var scrollTimes = Math.min(Math.ceil(count / 5), 10);
-      await page.evaluate(async (n) => { for (var i = 0; i < n; i++) { window.scrollBy(0, window.innerHeight); await new Promise(r => setTimeout(r, 1500)); } window.scrollTo(0, 0); }, scrollTimes);
-      await page.waitForTimeout(1000);
+      // Scroll repeatedly until enough tweets loaded or no more
+      for (var _s = 0; _s < 30; _s++) {
+        var _cur = await page.evaluate(() => document.querySelectorAll('article[data-testid="tweet"]').length);
+        if (_cur >= count) break;
+        await page.evaluate(() => window.scrollBy(0, window.innerHeight * 2));
+        await page.waitForTimeout(2000);
+        var _new = await page.evaluate(() => document.querySelectorAll('article[data-testid="tweet"]').length);
+        if (_new === _cur && _s > 3) break; // no more loading
+      }
 
       // Extract tweets
       var tweets = await page.evaluate((max) => {
