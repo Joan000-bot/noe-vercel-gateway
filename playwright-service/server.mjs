@@ -54,6 +54,19 @@ http.createServer(async (req, res) => {
         userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         viewport: { width: 1280, height: 720 }, locale: "zh-CN"
       });
+
+      // Inject X cookies when browsing x.com/twitter.com
+      if (url.includes("x.com") || url.includes("twitter.com")) {
+        var xCookies = [];
+        try { xCookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8")); } catch {}
+        if (!xCookies.length && X_AUTH && X_CT0) {
+          xCookies = [
+            { name: "auth_token", value: X_AUTH, domain: ".x.com", path: "/", httpOnly: true, secure: true, sameSite: "None" },
+            { name: "ct0", value: X_CT0, domain: ".x.com", path: "/", secure: true, sameSite: "Lax" }
+          ];
+        }
+        if (xCookies.length) await context.addCookies(xCookies);
+      }
       page = await context.newPage();
       page.setDefaultTimeout(15000);
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
@@ -192,6 +205,7 @@ http.createServer(async (req, res) => {
   // /x/timeline - Read X timeline with saved cookies
   if (req.url === "/x/timeline") {
     var username = body.username || "";
+    var count = Math.min(body.count || 10, 50);
     var context, page;
     try {
       // Load cookies - prefer full cookie file
@@ -214,14 +228,15 @@ http.createServer(async (req, res) => {
       await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
       await page.waitForTimeout(4000);
 
-      // Scroll to load tweets
-      await page.evaluate(async () => { for (var i = 0; i < 2; i++) { window.scrollBy(0, window.innerHeight); await new Promise(r => setTimeout(r, 1500)); } window.scrollTo(0, 0); });
+      // Scroll to load more tweets based on count
+      var scrollTimes = Math.min(Math.ceil(count / 5), 10);
+      await page.evaluate(async (n) => { for (var i = 0; i < n; i++) { window.scrollBy(0, window.innerHeight); await new Promise(r => setTimeout(r, 1500)); } window.scrollTo(0, 0); }, scrollTimes);
       await page.waitForTimeout(1000);
 
       // Extract tweets
-      var tweets = await page.evaluate(() => {
+      var tweets = await page.evaluate((max) => {
         var articles = document.querySelectorAll('article[data-testid="tweet"]');
-        return Array.from(articles).slice(0, 10).map(a => {
+        return Array.from(articles).slice(0, max).map(a => {
           var nameEl = a.querySelector('[data-testid="User-Name"]');
           var textEl = a.querySelector('[data-testid="tweetText"]');
           var timeEl = a.querySelector('time');
@@ -235,7 +250,7 @@ http.createServer(async (req, res) => {
             url: tweetLink
           };
         }).filter(t => t.text);
-      });
+      }, count);
 
       // Update cookies in case they refreshed
       var newCookies = await context.cookies();

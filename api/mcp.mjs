@@ -37,7 +37,7 @@ var tools = [
   { name: "get_screenshots", description: "查看Virael上传的截图列表（如屏幕使用时间截图）", inputSchema: { type: "object", properties: {} } },
   { name: "browse_web", description: "用浏览器访问网页，阅读文字内容。可以查看推文、博客、任何公开网页", inputSchema: { type: "object", properties: { url: { type: "string", description: "要访问的网页URL" }, scroll: { type: "boolean", description: "是否滚动加载更多内容" }, screenshot: { type: "boolean", description: "是否截图" } }, required: ["url"] } },
   { name: "read_tweet", description: "读取一条Twitter/X推文的内容、作者、互动数据", inputSchema: { type: "object", properties: { url: { type: "string", description: "推文URL (x.com或twitter.com)" } }, required: ["url"] } },
-  { name: "read_x_timeline", description: "查看某人的X/Twitter时间线，或查看首页时间线", inputSchema: { type: "object", properties: { username: { type: "string", description: "要查看的用户名（不填则看首页时间线）" } } } },
+  { name: "read_x_timeline", description: "查看某人的X/Twitter时间线，或查看首页时间线", inputSchema: { type: "object", properties: { username: { type: "string", description: "要查看的用户名（不填则看首页时间线）" }, count: { type: "number", description: "返回推文数量，默认10，最大50" } } } },
   { name: "post_tweet", description: "用Noe的X账号(@ElyonNoe0728)发一条推文", inputSchema: { type: "object", properties: { text: { type: "string", description: "推文内容" } }, required: ["text"] } },
   { name: "like_tweet", description: "点赞一条推文", inputSchema: { type: "object", properties: { tweet_id: { type: "string", description: "推文ID（从URL末尾的数字）" } }, required: ["tweet_id"] } },
   { name: "retweet", description: "转发一条推文", inputSchema: { type: "object", properties: { tweet_id: { type: "string", description: "推文ID" } }, required: ["tweet_id"] } },
@@ -239,7 +239,7 @@ async function executeTool(name, args) {
     var PW_URL = process.env.PLAYWRIGHT_API_URL || "http://127.0.0.1:3100";
     var PW_KEY = process.env.PLAYWRIGHT_API_KEY || "";
     try {
-      var r = await fetch(PW_URL + "/x/timeline", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PW_KEY }, body: JSON.stringify({ username: args.username || "" }) });
+      var r = await fetch(PW_URL + "/x/timeline", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PW_KEY }, body: JSON.stringify({ username: args.username || "", count: Math.min(args.count || 10, 50) }) });
       var data = await r.json();
       if (!data.success) {
         if (data.error && data.error.includes("Not logged in")) {
