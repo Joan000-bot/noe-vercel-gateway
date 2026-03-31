@@ -250,17 +250,13 @@ http.createServer(async (req, res) => {
     return;
   }
 
-  // /x/post - Post a tweet via Dallas proxy (HK IP is blocked by X)
+  // /x/post - Forward all X write actions to Dallas proxy (HK IP is blocked by X)
   if (req.url === "/x/post") {
-    var { text } = body;
-    if (!text) { res.writeHead(400); return res.end(JSON.stringify({ error: "text required" })); }
-
     try {
-      // Forward to Dallas VPS tweet proxy
       var r = await fetch("http://172.86.89.232:3101", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer noe-exec-2026-secret" },
-        body: JSON.stringify({ text: text })
+        body: JSON.stringify(body)
       });
       var data = await r.json();
       res.end(JSON.stringify(data));

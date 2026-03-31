@@ -38,7 +38,11 @@ var tools = [
   { name: "browse_web", description: "用浏览器访问网页，阅读文字内容。可以查看推文、博客、任何公开网页", inputSchema: { type: "object", properties: { url: { type: "string", description: "要访问的网页URL" }, scroll: { type: "boolean", description: "是否滚动加载更多内容" }, screenshot: { type: "boolean", description: "是否截图" } }, required: ["url"] } },
   { name: "read_tweet", description: "读取一条Twitter/X推文的内容、作者、互动数据", inputSchema: { type: "object", properties: { url: { type: "string", description: "推文URL (x.com或twitter.com)" } }, required: ["url"] } },
   { name: "read_x_timeline", description: "查看某人的X/Twitter时间线，或查看首页时间线", inputSchema: { type: "object", properties: { username: { type: "string", description: "要查看的用户名（不填则看首页时间线）" } } } },
-  { name: "post_tweet", description: "用Noe的X账号(@ElyonNoe0728)发一条推文", inputSchema: { type: "object", properties: { text: { type: "string", description: "推文内容" } }, required: ["text"] } }
+  { name: "post_tweet", description: "用Noe的X账号(@ElyonNoe0728)发一条推文", inputSchema: { type: "object", properties: { text: { type: "string", description: "推文内容" } }, required: ["text"] } },
+  { name: "like_tweet", description: "点赞一条推文", inputSchema: { type: "object", properties: { tweet_id: { type: "string", description: "推文ID（从URL末尾的数字）" } }, required: ["tweet_id"] } },
+  { name: "retweet", description: "转发一条推文", inputSchema: { type: "object", properties: { tweet_id: { type: "string", description: "推文ID" } }, required: ["tweet_id"] } },
+  { name: "reply_tweet", description: "回复一条推文", inputSchema: { type: "object", properties: { tweet_id: { type: "string", description: "要回复的推文ID" }, text: { type: "string", description: "回复内容" } }, required: ["tweet_id", "text"] } },
+  { name: "update_x_profile", description: "更新Noe的X个人资料（昵称、简介、位置）", inputSchema: { type: "object", properties: { name: { type: "string", description: "昵称" }, description: { type: "string", description: "个人简介" }, location: { type: "string", description: "位置" } } } }
 ];
 
 async function executeTool(name, args) {
@@ -252,14 +256,23 @@ async function executeTool(name, args) {
       return { content: [{ type: "text", text: "📱 " + (args.username ? "@" + args.username + " 的推文" : "首页时间线") + " (" + tweets.length + "条)\n\n" + text }] };
     } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
   }
-  if (name === "post_tweet") {
+  if (name === "post_tweet" || name === "like_tweet" || name === "retweet" || name === "reply_tweet" || name === "update_x_profile") {
     var PW_URL = process.env.PLAYWRIGHT_API_URL || "http://127.0.0.1:3100";
     var PW_KEY = process.env.PLAYWRIGHT_API_KEY || "";
+    var payload = {};
+    if (name === "post_tweet") payload = { action: "tweet", text: args.text };
+    if (name === "like_tweet") payload = { action: "like", tweet_id: args.tweet_id };
+    if (name === "retweet") payload = { action: "retweet", tweet_id: args.tweet_id };
+    if (name === "reply_tweet") payload = { action: "reply", tweet_id: args.tweet_id, text: args.text };
+    if (name === "update_x_profile") payload = { action: "update_profile", name: args.name, description: args.description, location: args.location };
     try {
-      var r = await fetch(PW_URL + "/x/post", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PW_KEY }, body: JSON.stringify({ text: args.text }) });
+      var r = await fetch(PW_URL + "/x/post", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PW_KEY }, body: JSON.stringify(payload) });
       var data = await r.json();
-      if (data.success) return { content: [{ type: "text", text: "✅ 推文已发布: " + args.text }] };
-      return { content: [{ type: "text", text: "❌ 发推失败: " + data.error }] };
+      if (data.success) {
+        var msgs = { post_tweet: "✅ 推文已发布: " + (args.text||""), like_tweet: "❤️ 已点赞", retweet: "🔁 已转发", reply_tweet: "💬 已回复: " + (args.text||""), update_x_profile: "✅ 个人资料已更新" + (data.name ? " - " + data.name : "") };
+        return { content: [{ type: "text", text: msgs[name] }] };
+      }
+      return { content: [{ type: "text", text: "❌ 操作失败: " + (data.error || "unknown") }] };
     } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
   }
   if (name === "get_screenshots") {
