@@ -5,6 +5,8 @@ import fs from "fs";
 const API_KEY = (() => { try { return fs.readFileSync("/root/playwright-key.txt", "utf-8").trim(); } catch { return "pw-noe-2026"; } })();
 const X_USER = (() => { try { return fs.readFileSync("/root/x-username.txt", "utf-8").trim(); } catch { return ""; } })();
 const X_PASS = (() => { try { return fs.readFileSync("/root/x-password.txt", "utf-8").trim(); } catch { return ""; } })();
+const X_AUTH = (() => { try { return fs.readFileSync("/root/x-auth-token.txt", "utf-8").trim(); } catch { return ""; } })();
+const X_CT0 = (() => { try { return fs.readFileSync("/root/x-ct0.txt", "utf-8").trim(); } catch { return ""; } })();
 const X_COOKIES_FILE = "/root/x-cookies.json";
 const PORT = 3100;
 
@@ -192,10 +194,17 @@ http.createServer(async (req, res) => {
     var username = body.username || "";
     var context, page;
     try {
-      // Load saved cookies
+      // Load cookies from files or saved session
       var cookies = [];
-      try { cookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8")); } catch {}
-      if (!cookies.length) { return res.end(JSON.stringify({ success: false, error: "Not logged in. Call /x/login first." })); }
+      if (X_AUTH && X_CT0) {
+        cookies = [
+          { name: "auth_token", value: X_AUTH, domain: ".x.com", path: "/", httpOnly: true, secure: true, sameSite: "None" },
+          { name: "ct0", value: X_CT0, domain: ".x.com", path: "/", secure: true, sameSite: "Lax" }
+        ];
+      } else {
+        try { cookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8")); } catch {}
+      }
+      if (!cookies.length) { return res.end(JSON.stringify({ success: false, error: "No X cookies configured." })); }
 
       var b = await getBrowser();
       context = await b.newContext({ viewport: { width: 1280, height: 720 }, locale: "zh-CN" });
