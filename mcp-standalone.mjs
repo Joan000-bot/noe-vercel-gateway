@@ -65,7 +65,11 @@ var tools = [
   { name: "read_weibo_post", description: "读取一条微博的详细内容和评论", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
   { name: "read_xiaohongshu", description: "搜索或浏览小红书内容", inputSchema: { type: "object", properties: { query: { type: "string", description: "搜索关键词" }, note_url: { type: "string", description: "笔记链接" } } } },
   { name: "read_xiaohongshu_profile", description: "查看小红书用户主页", inputSchema: { type: "object", properties: { user_url: { type: "string" } }, required: ["user_url"] } },
-  { name: "search_meituan_food", description: "在美团外卖搜索食物", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }
+  { name: "search_meituan_food", description: "在美团外卖搜索食物", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
+  { name: "search_ubereats", description: "在Uber Eats搜索餐厅和食物", inputSchema: { type: "object", properties: { query: { type: "string", description: "搜索关键词，如 pizza, bubble tea, ramen" } }, required: ["query"] } },
+  { name: "browse_ubereats_store", description: "浏览Uber Eats上的一家餐厅的菜单", inputSchema: { type: "object", properties: { store_url: { type: "string", description: "餐厅页面URL" } }, required: ["store_url"] } },
+  { name: "ubereats_add_to_cart", description: "将食物加入Uber Eats购物车", inputSchema: { type: "object", properties: { item_name: { type: "string", description: "菜品名称" }, store_url: { type: "string", description: "餐厅URL（如果还没在该店铺页面）" } }, required: ["item_name"] } },
+  { name: "ubereats_checkout", description: "查看Uber Eats购物车和订单详情（不会自动下单，需要Virael确认）", inputSchema: { type: "object", properties: {} } }
 ];
 
 // === Tool execution ===
@@ -215,6 +219,39 @@ async function executeTool(name, args) {
       var r = await fetch(PLAYWRIGHT_API_URL + "/meituan/search", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ query: args.query }) });
       var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法搜索美团: " + data.error }] };
       return { content: [{ type: "text", text: "🍜 美团外卖搜索: " + args.query + "\n\n" + data.data.content }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+
+  // Uber Eats
+  if (name === "search_ubereats") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/ubereats/search", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ query: args.query }) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法搜索Uber Eats: " + data.error }] };
+      var out = "🍔 Uber Eats 搜索: " + args.query + "\n\n" + data.data.content;
+      if (data.data.links?.length) out += "\n\n餐厅链接:\n" + data.data.links.map(l => "- " + l.text + "\n  " + l.href).join("\n");
+      return { content: [{ type: "text", text: out.substring(0, 15000) }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "browse_ubereats_store") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/ubereats/store", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ store_url: args.store_url }) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法打开餐厅: " + data.error }] };
+      return { content: [{ type: "text", text: "🍽️ 菜单:\n\n" + data.data.content.substring(0, 15000) }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "ubereats_add_to_cart") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/ubereats/add-to-cart", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ item_name: args.item_name, store_url: args.store_url }) });
+      var data = await r.json();
+      if (data.success) return { content: [{ type: "text", text: "✅ 已加入购物车: " + args.item_name }] };
+      return { content: [{ type: "text", text: "❌ 加入失败: " + data.error }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "ubereats_checkout") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/ubereats/checkout", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({}) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法查看购物车: " + data.error }] };
+      return { content: [{ type: "text", text: "🛒 订单详情（请确认后告诉我是否下单）:\n\n" + data.data.content.substring(0, 10000) + "\n\n⚠️ 我不会自动下单，请你确认后告诉我。" }] };
     } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
   }
 

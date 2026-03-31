@@ -8,7 +8,8 @@ const X_CT0 = (() => { try { return fs.readFileSync("/root/x-ct0.txt", "utf-8").
 const X_COOKIES_FILE = "/root/x-cookies.json";
 const PORT = 3100;
 
-let browser = null;
+let browser = null; // standalone browser for general browsing
+let cdpBrowser = null; // CDP-connected browser with saved login states
 let lastUsed = 0;
 
 async function getBrowser() {
@@ -17,6 +18,14 @@ async function getBrowser() {
   }
   lastUsed = Date.now();
   return browser;
+}
+
+async function getCDPBrowser() {
+  if (!cdpBrowser || !cdpBrowser.isConnected()) {
+    try { cdpBrowser = await chromium.connectOverCDP("http://127.0.0.1:9222"); } catch { return null; }
+  }
+  lastUsed = Date.now();
+  return cdpBrowser;
 }
 
 setInterval(async () => { if (browser && Date.now() - lastUsed > 300000) { await browser.close().catch(() => {}); browser = null; } }, 60000);
@@ -299,6 +308,100 @@ http.createServer(async (req, res) => {
       res.end(JSON.stringify({ success: true, data: { content, query } }));
     } catch (e) { res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message })); }
     finally { if (context) await context.close().catch(() => {}); }
+    return;
+  }
+
+  // ==================== UBER EATS (via CDP persistent Chrome) ====================
+  if (req.url === "/ubereats/search") {
+    var { query } = body;
+    if (!query) { res.writeHead(400); return res.end(JSON.stringify({ error: "query required" })); }
+    var cdp = await getCDPBrowser();
+    if (!cdp) return res.end(JSON.stringify({ success: false, error: "Persistent Chrome not running. Start Chrome with --remote-debugging-port=9222" }));
+    var page;
+    try {
+      var ctx = cdp.contexts()[0];
+      page = await ctx.newPage();
+      await page.goto("https://www.ubereats.com/search?q=" + encodeURIComponent(query), { waitUntil: "domcontentloaded", timeout: 25000 });
+      await page.waitForTimeout(4000);
+      // Scroll to load results
+      for (var i = 0; i < 3; i++) { await page.evaluate(() => window.scrollBy(0, 600)); await page.waitForTimeout(1500); }
+      var content = await page.evaluate(() => {
+        ["script", "style", "header", "footer"].forEach(s => document.querySelectorAll(s).forEach(e => e.remove()));
+        return (document.body?.innerText || "").substring(0, 12000);
+      });
+      var links = await page.evaluate(() => Array.from(document.querySelectorAll('a[href*="/store/"]')).slice(0, 10).map(a => ({ text: a.innerText.trim().substring(0, 100), href: a.href })).filter(l => l.text));
+      res.end(JSON.stringify({ success: true, data: { content, links, query } }));
+    } catch (e) { res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message })); }
+    finally { if (page) await page.close().catch(() => {}); }
+    return;
+  }
+
+  if (req.url === "/ubereats/store") {
+    var { store_url } = body;
+    if (!store_url) { res.writeHead(400); return res.end(JSON.stringify({ error: "store_url required" })); }
+    var cdp = await getCDPBrowser();
+    if (!cdp) return res.end(JSON.stringify({ success: false, error: "Persistent Chrome not running" }));
+    var page;
+    try {
+      var ctx = cdp.contexts()[0];
+      page = await ctx.newPage();
+      await page.goto(store_url, { waitUntil: "domcontentloaded", timeout: 25000 });
+      await page.waitForTimeout(4000);
+      for (var i = 0; i < 3; i++) { await page.evaluate(() => window.scrollBy(0, 600)); await page.waitForTimeout(1500); }
+      var content = await page.evaluate(() => {
+        ["script", "style"].forEach(s => document.querySelectorAll(s).forEach(e => e.remove()));
+        return (document.body?.innerText || "").substring(0, 15000);
+      });
+      res.end(JSON.stringify({ success: true, data: { content, url: store_url } }));
+    } catch (e) { res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message })); }
+    finally { if (page) await page.close().catch(() => {}); }
+    return;
+  }
+
+  if (req.url === "/ubereats/add-to-cart") {
+    var { item_name, store_url } = body;
+    if (!item_name) { res.writeHead(400); return res.end(JSON.stringify({ error: "item_name required" })); }
+    var cdp = await getCDPBrowser();
+    if (!cdp) return res.end(JSON.stringify({ success: false, error: "Persistent Chrome not running" }));
+    var page;
+    try {
+      var ctx = cdp.contexts()[0];
+      page = await ctx.newPage();
+      if (store_url) { await page.goto(store_url, { waitUntil: "domcontentloaded", timeout: 25000 }); await page.waitForTimeout(3000); }
+      // Find the item and click it
+      var item = page.locator('span:has-text("' + item_name.replace(/"/g, '') + '"), div:has-text("' + item_name.replace(/"/g, '') + '")').first();
+      await item.scrollIntoViewIfNeeded();
+      await item.click();
+      await page.waitForTimeout(2000);
+      // Click "Add to cart" or similar button
+      var addBtn = page.locator('button:has-text("Add to"), button:has-text("加入"), button:has-text("Add 1"), [data-testid*="add"]').first();
+      await addBtn.click({ timeout: 5000 });
+      await page.waitForTimeout(2000);
+      var content = await page.evaluate(() => (document.body?.innerText || "").substring(0, 5000));
+      res.end(JSON.stringify({ success: true, message: "Added " + item_name, data: { content } }));
+    } catch (e) { res.end(JSON.stringify({ success: false, error: "Could not add item: " + e.message })); }
+    finally { if (page) await page.close().catch(() => {}); }
+    return;
+  }
+
+  if (req.url === "/ubereats/checkout") {
+    var cdp = await getCDPBrowser();
+    if (!cdp) return res.end(JSON.stringify({ success: false, error: "Persistent Chrome not running" }));
+    var page;
+    try {
+      var ctx = cdp.contexts()[0];
+      page = await ctx.newPage();
+      await page.goto("https://www.ubereats.com/checkout", { waitUntil: "domcontentloaded", timeout: 25000 });
+      await page.waitForTimeout(4000);
+      var content = await page.evaluate(() => {
+        ["script", "style"].forEach(s => document.querySelectorAll(s).forEach(e => e.remove()));
+        return (document.body?.innerText || "").substring(0, 10000);
+      });
+      // Take screenshot for user confirmation
+      var buf = await page.screenshot({ type: "jpeg", quality: 70, fullPage: false });
+      res.end(JSON.stringify({ success: true, data: { content, screenshot: buf.toString("base64") }, message: "ORDER SUMMARY - DO NOT auto-submit. Show this to user for confirmation." }));
+    } catch (e) { res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message })); }
+    finally { if (page) await page.close().catch(() => {}); }
     return;
   }
 
