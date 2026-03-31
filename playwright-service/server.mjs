@@ -250,78 +250,20 @@ http.createServer(async (req, res) => {
     return;
   }
 
-  // /x/post - Post a tweet via X internal API
+  // /x/post - Post a tweet via Dallas proxy (HK IP is blocked by X)
   if (req.url === "/x/post") {
     var { text } = body;
     if (!text) { res.writeHead(400); return res.end(JSON.stringify({ error: "text required" })); }
 
-    // Read cookies
-    var authToken = "", ct0Token = "";
     try {
-      var cookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8"));
-      var at = cookies.find(c => c.name === "auth_token");
-      var ct = cookies.find(c => c.name === "ct0");
-      if (at) authToken = at.value;
-      if (ct) ct0Token = ct.value;
-    } catch {}
-    if (!authToken) authToken = X_AUTH;
-    if (!ct0Token) ct0Token = X_CT0;
-
-    if (!authToken || !ct0Token) { return res.end(JSON.stringify({ success: false, error: "No X cookies" })); }
-
-    try {
-      var r = await fetch("https://x.com/i/api/graphql/a1p9RWpkYKBjWv_I3WzS-A/CreateTweet", {
+      // Forward to Dallas VPS tweet proxy
+      var r = await fetch("http://172.86.89.232:3101", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA",
-          "Cookie": "auth_token=" + authToken + "; ct0=" + ct0Token,
-          "X-Csrf-Token": ct0Token,
-          "X-Twitter-Auth-Type": "OAuth2Session",
-          "X-Twitter-Active-User": "yes"
-        },
-        body: JSON.stringify({
-          variables: {
-            tweet_text: text,
-            dark_request: false,
-            media: { media_entities: [], possibly_sensitive: false },
-            semantic_annotation_ids: []
-          },
-          features: {
-            communities_web_enable_tweet_community_results_fetch: true,
-            c9s_tweet_anatomy_moderator_badge_enabled: true,
-            tweetypie_unmention_optimization_enabled: true,
-            responsive_web_edit_tweet_api_enabled: true,
-            graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
-            view_counts_everywhere_api_enabled: true,
-            longform_notetweets_consumption_enabled: true,
-            responsive_web_twitter_article_tweet_consumption_enabled: true,
-            tweet_awards_web_tipping_enabled: false,
-            creator_subscriptions_quote_tweet_preview_enabled: false,
-            longform_notetweets_rich_text_read_enabled: true,
-            longform_notetweets_inline_media_enabled: true,
-            articles_preview_enabled: true,
-            rweb_video_timestamps_enabled: true,
-            rweb_tipjar_consumption_enabled: true,
-            responsive_web_graphql_exclude_directive_enabled: true,
-            verified_phone_label_enabled: false,
-            freedom_of_speech_not_reach_fetch_enabled: true,
-            standardized_nudges_misinfo: true,
-            tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
-            responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
-            responsive_web_graphql_timeline_navigation_enabled: true,
-            responsive_web_enhance_cards_enabled: false
-          },
-          queryId: "a1p9RWpkYKBjWv_I3WzS-A"
-        })
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer noe-exec-2026-secret" },
+        body: JSON.stringify({ text: text })
       });
-
       var data = await r.json();
-      if (data.data?.create_tweet?.tweet_results?.result) {
-        res.end(JSON.stringify({ success: true, message: "Tweet posted!", id: data.data.create_tweet.tweet_results.result.rest_id }));
-      } else {
-        res.end(JSON.stringify({ success: false, error: JSON.stringify(data.errors || data).substring(0, 500) }));
-      }
+      res.end(JSON.stringify(data));
     } catch (e) {
       res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message }));
     }
