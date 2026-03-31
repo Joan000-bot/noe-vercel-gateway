@@ -59,7 +59,13 @@ var tools = [
   { name: "like_tweet", description: "点赞推文", inputSchema: { type: "object", properties: { tweet_id: { type: "string" } }, required: ["tweet_id"] } },
   { name: "retweet", description: "转发推文", inputSchema: { type: "object", properties: { tweet_id: { type: "string" } }, required: ["tweet_id"] } },
   { name: "reply_tweet", description: "回复推文", inputSchema: { type: "object", properties: { tweet_id: { type: "string" }, text: { type: "string" } }, required: ["tweet_id", "text"] } },
-  { name: "update_x_profile", description: "更新X个人资料", inputSchema: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, location: { type: "string" } } } }
+  { name: "update_x_profile", description: "更新X个人资料", inputSchema: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, location: { type: "string" } } } },
+  { name: "read_weibo_timeline", description: "查看微博时间线", inputSchema: { type: "object", properties: { username: { type: "string", description: "微博UID（不填看关注的人的微博）" }, count: { type: "number" } } } },
+  { name: "post_weibo", description: "发一条微博", inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] } },
+  { name: "read_weibo_post", description: "读取一条微博的详细内容和评论", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
+  { name: "read_xiaohongshu", description: "搜索或浏览小红书内容", inputSchema: { type: "object", properties: { query: { type: "string", description: "搜索关键词" }, note_url: { type: "string", description: "笔记链接" } } } },
+  { name: "read_xiaohongshu_profile", description: "查看小红书用户主页", inputSchema: { type: "object", properties: { user_url: { type: "string" } }, required: ["user_url"] } },
+  { name: "search_meituan_food", description: "在美团外卖搜索食物", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }
 ];
 
 // === Tool execution ===
@@ -162,6 +168,53 @@ async function executeTool(name, args) {
       var data = await r.json();
       if (data.success) { var msgs = { post_tweet: "✅ 推文已发布", like_tweet: "❤️ 已点赞", retweet: "🔁 已转发", reply_tweet: "💬 已回复", update_x_profile: "✅ 已更新" }; return { content: [{ type: "text", text: msgs[name] }] }; }
       return { content: [{ type: "text", text: "❌ 失败: " + (data.error || "unknown") }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+
+  // Weibo
+  if (name === "read_weibo_timeline") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/weibo/timeline", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ username: args.username || "", count: args.count || 10 }) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法读取微博: " + data.error }] };
+      return { content: [{ type: "text", text: "📱 微博时间线:\n\n" + data.data.content }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "post_weibo") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/weibo/post", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ text: args.text }) });
+      var data = await r.json(); return { content: [{ type: "text", text: data.success ? "✅ 微博已发送" : "❌ 发送失败: " + data.error }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "read_weibo_post") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/weibo/read", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ url: args.url }) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法读取: " + data.error }] };
+      return { content: [{ type: "text", text: data.data.content }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+
+  // Xiaohongshu
+  if (name === "read_xiaohongshu") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/xhs/search", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ query: args.query, note_url: args.note_url }) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法访问小红书: " + data.error }] };
+      return { content: [{ type: "text", text: "📕 小红书:\n\n" + data.data.content }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "read_xiaohongshu_profile") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/xhs/profile", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ user_url: args.user_url }) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法访问: " + data.error }] };
+      return { content: [{ type: "text", text: "📕 小红书用户:\n\n" + data.data.content }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+
+  // Meituan
+  if (name === "search_meituan_food") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/meituan/search", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ query: args.query }) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法搜索美团: " + data.error }] };
+      return { content: [{ type: "text", text: "🍜 美团外卖搜索: " + args.query + "\n\n" + data.data.content }] };
     } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
   }
 
