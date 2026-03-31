@@ -194,15 +194,14 @@ http.createServer(async (req, res) => {
     var username = body.username || "";
     var context, page;
     try {
-      // Load cookies from files or saved session
+      // Load cookies - prefer full cookie file
       var cookies = [];
-      if (X_AUTH && X_CT0) {
+      try { cookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8")); } catch {}
+      if (!cookies.length && X_AUTH && X_CT0) {
         cookies = [
           { name: "auth_token", value: X_AUTH, domain: ".x.com", path: "/", httpOnly: true, secure: true, sameSite: "None" },
           { name: "ct0", value: X_CT0, domain: ".x.com", path: "/", secure: true, sameSite: "Lax" }
         ];
-      } else {
-        try { cookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8")); } catch {}
       }
       if (!cookies.length) { return res.end(JSON.stringify({ success: false, error: "No X cookies configured." })); }
 
@@ -257,7 +256,8 @@ http.createServer(async (req, res) => {
     if (!text) { res.writeHead(400); return res.end(JSON.stringify({ error: "text required" })); }
 
     var cookies = [];
-    if (X_AUTH && X_CT0) {
+    try { cookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8")); } catch {}
+    if (!cookies.length && X_AUTH && X_CT0) {
       cookies = [
         { name: "auth_token", value: X_AUTH, domain: ".x.com", path: "/", httpOnly: true, secure: true, sameSite: "None" },
         { name: "ct0", value: X_CT0, domain: ".x.com", path: "/", secure: true, sameSite: "Lax" }
