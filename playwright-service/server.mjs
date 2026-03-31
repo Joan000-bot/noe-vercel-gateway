@@ -250,51 +250,80 @@ http.createServer(async (req, res) => {
     return;
   }
 
-  // /x/post - Post a tweet
+  // /x/post - Post a tweet via X internal API
   if (req.url === "/x/post") {
     var { text } = body;
     if (!text) { res.writeHead(400); return res.end(JSON.stringify({ error: "text required" })); }
 
-    var cookies = [];
-    try { cookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8")); } catch {}
-    if (!cookies.length && X_AUTH && X_CT0) {
-      cookies = [
-        { name: "auth_token", value: X_AUTH, domain: ".x.com", path: "/", httpOnly: true, secure: true, sameSite: "None" },
-        { name: "ct0", value: X_CT0, domain: ".x.com", path: "/", secure: true, sameSite: "Lax" }
-      ];
-    }
-    if (!cookies.length) { return res.end(JSON.stringify({ success: false, error: "No X cookies" })); }
-
-    var context, page;
+    // Read cookies
+    var authToken = "", ct0Token = "";
     try {
-      var b = await getBrowser();
-      context = await b.newContext({ viewport: { width: 1280, height: 720 }, locale: "en-US" });
-      await context.addCookies(cookies);
-      page = await context.newPage();
+      var cookies = JSON.parse(fs.readFileSync(X_COOKIES_FILE, "utf-8"));
+      var at = cookies.find(c => c.name === "auth_token");
+      var ct = cookies.find(c => c.name === "ct0");
+      if (at) authToken = at.value;
+      if (ct) ct0Token = ct.value;
+    } catch {}
+    if (!authToken) authToken = X_AUTH;
+    if (!ct0Token) ct0Token = X_CT0;
 
-      await page.goto("https://x.com/compose/post", { waitUntil: "networkidle", timeout: 25000 });
-      await page.waitForTimeout(3000);
+    if (!authToken || !ct0Token) { return res.end(JSON.stringify({ success: false, error: "No X cookies" })); }
 
-      // Type the tweet
-      var editor = page.locator('[data-testid="tweetTextarea_0"], [role="textbox"]').first();
-      await editor.waitFor({ timeout: 10000 });
-      await editor.fill(text);
-      await page.waitForTimeout(1000);
+    try {
+      var r = await fetch("https://x.com/i/api/graphql/a1p9RWpkYKBjWv_I3WzS-A/CreateTweet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA",
+          "Cookie": "auth_token=" + authToken + "; ct0=" + ct0Token,
+          "X-Csrf-Token": ct0Token,
+          "X-Twitter-Auth-Type": "OAuth2Session",
+          "X-Twitter-Active-User": "yes"
+        },
+        body: JSON.stringify({
+          variables: {
+            tweet_text: text,
+            dark_request: false,
+            media: { media_entities: [], possibly_sensitive: false },
+            semantic_annotation_ids: []
+          },
+          features: {
+            communities_web_enable_tweet_community_results_fetch: true,
+            c9s_tweet_anatomy_moderator_badge_enabled: true,
+            tweetypie_unmention_optimization_enabled: true,
+            responsive_web_edit_tweet_api_enabled: true,
+            graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+            view_counts_everywhere_api_enabled: true,
+            longform_notetweets_consumption_enabled: true,
+            responsive_web_twitter_article_tweet_consumption_enabled: true,
+            tweet_awards_web_tipping_enabled: false,
+            creator_subscriptions_quote_tweet_preview_enabled: false,
+            longform_notetweets_rich_text_read_enabled: true,
+            longform_notetweets_inline_media_enabled: true,
+            articles_preview_enabled: true,
+            rweb_video_timestamps_enabled: true,
+            rweb_tipjar_consumption_enabled: true,
+            responsive_web_graphql_exclude_directive_enabled: true,
+            verified_phone_label_enabled: false,
+            freedom_of_speech_not_reach_fetch_enabled: true,
+            standardized_nudges_misinfo: true,
+            tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+            responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+            responsive_web_graphql_timeline_navigation_enabled: true,
+            responsive_web_enhance_cards_enabled: false
+          },
+          queryId: "a1p9RWpkYKBjWv_I3WzS-A"
+        })
+      });
 
-      // Click post button
-      var postBtn = page.locator('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]').first();
-      await postBtn.click();
-      await page.waitForTimeout(4000);
-
-      // Update cookies
-      var newCookies = await context.cookies();
-      fs.writeFileSync(X_COOKIES_FILE, JSON.stringify(newCookies, null, 2));
-
-      res.end(JSON.stringify({ success: true, message: "Tweet posted: " + text.substring(0, 50) }));
+      var data = await r.json();
+      if (data.data?.create_tweet?.tweet_results?.result) {
+        res.end(JSON.stringify({ success: true, message: "Tweet posted!", id: data.data.create_tweet.tweet_results.result.rest_id }));
+      } else {
+        res.end(JSON.stringify({ success: false, error: JSON.stringify(data.errors || data).substring(0, 500) }));
+      }
     } catch (e) {
       res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message }));
-    } finally {
-      if (context) await context.close().catch(() => {});
     }
     return;
   }
