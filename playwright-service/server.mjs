@@ -251,6 +251,54 @@ http.createServer(async (req, res) => {
     return;
   }
 
+  // /x/post - Post a tweet
+  if (req.url === "/x/post") {
+    var { text } = body;
+    if (!text) { res.writeHead(400); return res.end(JSON.stringify({ error: "text required" })); }
+
+    var cookies = [];
+    if (X_AUTH && X_CT0) {
+      cookies = [
+        { name: "auth_token", value: X_AUTH, domain: ".x.com", path: "/", httpOnly: true, secure: true, sameSite: "None" },
+        { name: "ct0", value: X_CT0, domain: ".x.com", path: "/", secure: true, sameSite: "Lax" }
+      ];
+    }
+    if (!cookies.length) { return res.end(JSON.stringify({ success: false, error: "No X cookies" })); }
+
+    var context, page;
+    try {
+      var b = await getBrowser();
+      context = await b.newContext({ viewport: { width: 1280, height: 720 }, locale: "en-US" });
+      await context.addCookies(cookies);
+      page = await context.newPage();
+
+      await page.goto("https://x.com/compose/post", { waitUntil: "networkidle", timeout: 25000 });
+      await page.waitForTimeout(3000);
+
+      // Type the tweet
+      var editor = page.locator('[data-testid="tweetTextarea_0"], [role="textbox"]').first();
+      await editor.waitFor({ timeout: 10000 });
+      await editor.fill(text);
+      await page.waitForTimeout(1000);
+
+      // Click post button
+      var postBtn = page.locator('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]').first();
+      await postBtn.click();
+      await page.waitForTimeout(4000);
+
+      // Update cookies
+      var newCookies = await context.cookies();
+      fs.writeFileSync(X_COOKIES_FILE, JSON.stringify(newCookies, null, 2));
+
+      res.end(JSON.stringify({ success: true, message: "Tweet posted: " + text.substring(0, 50) }));
+    } catch (e) {
+      res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message }));
+    } finally {
+      if (context) await context.close().catch(() => {});
+    }
+    return;
+  }
+
   res.writeHead(404); res.end(JSON.stringify({ error: "Not found" }));
 
 }).listen(PORT, "127.0.0.1", () => console.log("Playwright service on port " + PORT));
