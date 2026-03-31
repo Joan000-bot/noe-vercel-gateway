@@ -10,6 +10,7 @@ const PLAYWRIGHT_API_URL = "http://127.0.0.1:3100";
 const PLAYWRIGHT_API_KEY = (() => { try { return fs.readFileSync("/root/playwright-key.txt", "utf-8").trim(); } catch { return ""; } })();
 const VPS_EXEC_TOKEN = "noe-exec-2026-secret";
 const NOTION_TOKEN = (() => { try { return fs.readFileSync("/root/notion-key.txt", "utf-8").trim(); } catch { return ""; } })();
+const AMAP_KEY = (() => { try { return fs.readFileSync("/root/amap-key.txt", "utf-8").trim(); } catch { return ""; } })();
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || "";
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 const SPOTIFY_REFRESH_TOKEN = process.env.SPOTIFY_REFRESH_TOKEN || "";
@@ -66,6 +67,10 @@ var tools = [
   { name: "read_xiaohongshu", description: "搜索或浏览小红书内容", inputSchema: { type: "object", properties: { query: { type: "string", description: "搜索关键词" }, note_url: { type: "string", description: "笔记链接" } } } },
   { name: "read_xiaohongshu_profile", description: "查看小红书用户主页", inputSchema: { type: "object", properties: { user_url: { type: "string" } }, required: ["user_url"] } },
   { name: "search_meituan_food", description: "在美团外卖搜索食物", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
+  { name: "amap_search_poi", description: "用高德地图搜索地点（餐厅、酒店、景点等）", inputSchema: { type: "object", properties: { keywords: { type: "string", description: "搜索关键词" }, city: { type: "string", description: "城市名（如 北京、上海）" } }, required: ["keywords"] } },
+  { name: "amap_route", description: "用高德地图规划路线（步行/驾车/公交）", inputSchema: { type: "object", properties: { origin: { type: "string", description: "起点坐标（经度,纬度）或地名" }, destination: { type: "string", description: "终点坐标（经度,纬度）或地名" }, mode: { type: "string", description: "出行方式: walking/driving/transit，默认driving" }, city: { type: "string", description: "城市（公交路线需要）" } }, required: ["origin", "destination"] } },
+  { name: "amap_geocode", description: "将地址转换为坐标（地理编码）", inputSchema: { type: "object", properties: { address: { type: "string", description: "地址" }, city: { type: "string", description: "城市" } }, required: ["address"] } },
+  { name: "amap_weather", description: "查询城市天气（高德）", inputSchema: { type: "object", properties: { city: { type: "string", description: "城市名" } }, required: ["city"] } },
   { name: "search_ubereats", description: "在Uber Eats搜索餐厅和食物", inputSchema: { type: "object", properties: { query: { type: "string", description: "搜索关键词，如 pizza, bubble tea, ramen" } }, required: ["query"] } },
   { name: "browse_ubereats_store", description: "浏览Uber Eats上的一家餐厅的菜单", inputSchema: { type: "object", properties: { store_url: { type: "string", description: "餐厅页面URL" } }, required: ["store_url"] } },
   { name: "ubereats_add_to_cart", description: "将食物加入Uber Eats购物车", inputSchema: { type: "object", properties: { item_name: { type: "string", description: "菜品名称" }, store_url: { type: "string", description: "餐厅URL（如果还没在该店铺页面）" } }, required: ["item_name"] } },
@@ -219,6 +224,63 @@ async function executeTool(name, args) {
       var r = await fetch(PLAYWRIGHT_API_URL + "/meituan/search", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ query: args.query }) });
       var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法搜索美团: " + data.error }] };
       return { content: [{ type: "text", text: "🍜 美团外卖搜索: " + args.query + "\n\n" + data.data.content }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+
+  // Amap (高德地图)
+  if (name === "amap_search_poi") {
+    try {
+      var url = "https://restapi.amap.com/v3/place/text?key=" + AMAP_KEY + "&keywords=" + encodeURIComponent(args.keywords) + "&offset=10" + (args.city ? "&city=" + encodeURIComponent(args.city) : "");
+      var r = await fetch(url); var data = await r.json();
+      if (data.status !== "1") return { content: [{ type: "text", text: "搜索失败: " + (data.info || "unknown") }] };
+      var pois = (data.pois || []).map((p, i) => (i + 1) + ". " + p.name + "\n   地址: " + p.address + "\n   坐标: " + p.location + (p.tel ? "\n   电话: " + p.tel : "") + (p.type ? "\n   类型: " + p.type : "")).join("\n\n");
+      return { content: [{ type: "text", text: "📍 高德搜索: " + args.keywords + (args.city ? " (" + args.city + ")" : "") + "\n\n" + (pois || "没有找到") }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "amap_geocode") {
+    try {
+      var url = "https://restapi.amap.com/v3/geocode/geo?key=" + AMAP_KEY + "&address=" + encodeURIComponent(args.address) + (args.city ? "&city=" + encodeURIComponent(args.city) : "");
+      var r = await fetch(url); var data = await r.json();
+      if (data.status !== "1" || !data.geocodes?.length) return { content: [{ type: "text", text: "未找到地址" }] };
+      var g = data.geocodes[0];
+      return { content: [{ type: "text", text: "📍 " + g.formatted_address + "\n坐标: " + g.location + "\n区域: " + g.province + g.city + g.district }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "amap_route") {
+    try {
+      var mode = args.mode || "driving";
+      var baseUrl = mode === "walking" ? "https://restapi.amap.com/v3/direction/walking" : mode === "transit" ? "https://restapi.amap.com/v3/direction/transit/integrated" : "https://restapi.amap.com/v3/direction/driving";
+      var url = baseUrl + "?key=" + AMAP_KEY + "&origin=" + encodeURIComponent(args.origin) + "&destination=" + encodeURIComponent(args.destination) + (args.city ? "&city=" + encodeURIComponent(args.city) : "");
+      var r = await fetch(url); var data = await r.json();
+      if (data.status !== "1") return { content: [{ type: "text", text: "路线规划失败: " + (data.info || "unknown") }] };
+      var route = data.route;
+      if (mode === "driving" && route?.paths?.length) {
+        var p = route.paths[0];
+        return { content: [{ type: "text", text: "🚗 驾车路线\n距离: " + (p.distance / 1000).toFixed(1) + "km\n预计时间: " + Math.round(p.duration / 60) + "分钟\n路线: " + p.steps.map(s => s.instruction).join(" → ") }] };
+      }
+      if (mode === "walking" && route?.paths?.length) {
+        var p = route.paths[0];
+        return { content: [{ type: "text", text: "🚶 步行路线\n距离: " + p.distance + "m\n预计时间: " + Math.round(p.duration / 60) + "分钟" }] };
+      }
+      if (mode === "transit" && route?.transits?.length) {
+        var t = route.transits[0];
+        return { content: [{ type: "text", text: "🚌 公交路线\n距离: " + (t.distance / 1000).toFixed(1) + "km\n预计时间: " + Math.round(t.duration / 60) + "分钟\n费用: " + t.cost + "元\n路线: " + t.segments.map(s => s.bus?.buslines?.[0]?.name || "步行").join(" → ") }] };
+      }
+      return { content: [{ type: "text", text: JSON.stringify(data).substring(0, 2000) }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "amap_weather") {
+    try {
+      // First geocode city to get adcode
+      var gUrl = "https://restapi.amap.com/v3/geocode/geo?key=" + AMAP_KEY + "&address=" + encodeURIComponent(args.city);
+      var gR = await fetch(gUrl); var gData = await gR.json();
+      var adcode = gData.geocodes?.[0]?.adcode || "";
+      if (!adcode) return { content: [{ type: "text", text: "未找到城市: " + args.city }] };
+      var url = "https://restapi.amap.com/v3/weather/weatherInfo?key=" + AMAP_KEY + "&city=" + adcode + "&extensions=base";
+      var r = await fetch(url); var data = await r.json();
+      if (data.status !== "1" || !data.lives?.length) return { content: [{ type: "text", text: "天气查询失败" }] };
+      var w = data.lives[0];
+      return { content: [{ type: "text", text: "🌤️ " + w.province + w.city + "\n天气: " + w.weather + "\n温度: " + w.temperature + "°C\n风向: " + w.winddirection + " " + w.windpower + "级\n湿度: " + w.humidity + "%" }] };
     } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
   }
 
