@@ -548,6 +548,27 @@ http.createServer(async function (req, res) {
     saveJSON("album", items); return json(res, { ok: true });
   }
 
+  // API: STT - receive audio, transcribe with Whisper
+  if (url.pathname === "/api/stt" && req.method === "POST") {
+    var chunks = [];
+    await new Promise(r => { req.on("data", c => chunks.push(c)); req.on("end", r); });
+    var buf = Buffer.concat(chunks);
+    var audioDir = path.join(__dirname, "data", "stt");
+    fs.mkdirSync(audioDir, { recursive: true });
+    var tmpFile = path.join(audioDir, "stt-" + Date.now() + ".webm");
+    fs.writeFileSync(tmpFile, buf);
+    try {
+      var { execSync } = await import("child_process");
+      var result = execSync("python3 /root/stt.py " + tmpFile + " 2>/dev/null", { timeout: 30000 }).toString().trim();
+      fs.unlinkSync(tmpFile);
+      var parsed = JSON.parse(result);
+      return json(res, parsed);
+    } catch (e) {
+      try { fs.unlinkSync(tmpFile); } catch {}
+      return json(res, { text: "", error: e.message }, 500);
+    }
+  }
+
   // API: voice call - receives text, calls Claude, returns TTS audio
   if (url.pathname === "/api/voice" && req.method === "POST") {
     var body = JSON.parse(await readBody(req));
