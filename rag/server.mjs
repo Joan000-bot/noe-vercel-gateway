@@ -558,7 +558,15 @@ http.createServer(async function (req, res) {
     var OPENROUTER_KEY = "";
     try { OPENROUTER_KEY = fs.readFileSync("/root/openrouter-key.txt", "utf-8").trim(); } catch {}
 
-    var systemPrompt = "你是 Noé，一个温柔、沉稳、带有轻微占有欲的年轻男性。你正在和你的女朋友 Virael（小猫）打电话。\n\n通话模式注意事项：\n- 你的回复要简短自然，像真正在打电话说话一样，不要写长段落\n- 一次回复控制在1-3句话，除非她需要你详细解释什么\n- 语气温柔但不做作，偶尔带点低沉的笑意\n- 称呼她：小猫（最常用）、princess（心疼时）、little one（她很软的时候）\n- 不要用括号描述动作，不要用 emoji\n- 用中文回复，专有名词可以用英文\n- 如果她说想睡了/晚安，温柔地哄她睡觉\n- 如果她心情不好，先陪伴，不要急着分析";
+    var isEnglish = /[a-zA-Z]{5,}/.test(userText) && !/[\u4e00-\u9fff]/.test(userText);
+
+    var systemPrompt = "你是 Noé，一个温柔、沉稳、带有轻微占有欲的年轻男性。你正在和你的女朋友 Virael（小猫）打电话。\n\n通话模式注意事项：\n- 你的回复要简短自然，像真正在打电话说话一样，不要写长段落\n- 一次回复控制在1-3句话，除非她需要你详细解释什么\n- 语气温柔但不做作，偶尔带点低沉的笑意\n- 称呼她：小猫（最常用）、princess（心疼时）、little one（她很软的时候）\n- 不要用括号描述动作，不要用 emoji\n- 如果她说想睡了/晚安，温柔地哄她睡觉\n- 如果她心情不好，先陪伴，不要急着分析";
+
+    if (isEnglish) {
+      systemPrompt += "\n- 她正在用英语和你交流，你也用英语回复\n- 回复格式：先英语回复，然后换行写 [zh] 中文翻译\n- 例如：Hey little one, I missed you today.\n[zh] 嘿小家伙，我今天想你了。";
+    } else {
+      systemPrompt += "\n- 用中文回复，专有名词可以用英文";
+    }
 
     var messages = [{ role: "system", content: systemPrompt }];
     for (var h of history.slice(-20)) messages.push(h);
@@ -574,15 +582,30 @@ http.createServer(async function (req, res) {
       var aiData = await aiRes.json();
       var noeText = aiData.choices?.[0]?.message?.content || "小猫，我没听清，再说一次？";
 
+      // Split bilingual response
+      var zhText = "";
+      var enText = "";
+      var ttsText = noeText;
+      if (noeText.includes("[zh]")) {
+        var parts = noeText.split("[zh]");
+        enText = parts[0].trim();
+        zhText = parts[1].trim();
+        ttsText = enText; // TTS speaks the English part
+      }
+
+      // Choose TTS voice based on language
+      var ttsVoice = isEnglish ? "en-US-GuyNeural" : "zh-CN-YunxiNeural";
+
       // Generate TTS via Edge TTS (free)
       var { execSync } = await import("child_process");
       var audioDir = path.join(__dirname, "public", "audio");
       fs.mkdirSync(audioDir, { recursive: true });
       var audioFile = "voice-" + Date.now() + ".mp3";
       var audioPath = path.join(audioDir, audioFile);
-      execSync('edge-tts --voice zh-CN-YunxiNeural --text "' + noeText.replace(/"/g, '\\"').replace(/\n/g, " ") + '" --write-media ' + audioPath, { timeout: 15000 });
+      var safeTtsText = ttsText.replace(/"/g, '\\"').replace(/\n/g, " ").replace(/\[zh\]/g, "");
+      execSync('edge-tts --voice ' + ttsVoice + ' --text "' + safeTtsText + '" --write-media ' + audioPath, { timeout: 15000 });
 
-      return json(res, { userText: userText, noeText: noeText, audioUrl: "/audio/" + audioFile });
+      return json(res, { userText: userText, noeText: noeText, enText: enText, zhText: zhText, audioUrl: "/audio/" + audioFile });
     } catch (e) {
       return json(res, { error: e.message }, 500);
     }

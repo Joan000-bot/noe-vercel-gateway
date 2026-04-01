@@ -175,6 +175,22 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
 .bubble pre{background:rgba(0,0,0,0.3);padding:8px;border-radius:8px;overflow-x:auto;margin:5px 0}
 .bubble pre code{background:none;padding:0}
 
+/* Voice Call Mode */
+.voice-overlay{display:none;position:absolute;inset:0;z-index:20;background:rgba(7,11,22,0.95);backdrop-filter:blur(20px);flex-direction:column;align-items:center;justify-content:center}
+.voice-overlay.active{display:flex}
+.vo-status{font-size:13px;color:var(--text2);font-style:italic;letter-spacing:1px;margin-bottom:20px;min-height:20px}
+.vo-transcript{max-width:80%;text-align:center;font-size:14px;color:var(--text);min-height:40px;margin-bottom:20px;line-height:1.6;max-height:120px;overflow-y:auto}
+.vo-transcript .zh{font-size:12px;color:var(--text2);margin-top:4px}
+.vo-waveform{display:flex;align-items:center;justify-content:center;gap:3px;height:50px;margin-bottom:30px}
+.vo-waveform .vbar{width:3px;border-radius:2px;background:var(--accent);transition:height .1s}
+.vo-mic{width:80px;height:80px;border-radius:50%;border:2px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text2);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s;-webkit-tap-highlight-color:transparent;margin-bottom:12px}
+.vo-mic.recording{border-color:#f44;background:rgba(255,60,60,0.15);color:#f66;animation:vpulse 1.5s infinite}
+.vo-mic.disabled{opacity:0.3;pointer-events:none}
+@keyframes vpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,60,60,0.3)}50%{box-shadow:0 0 0 15px rgba(255,60,60,0)}}
+.vo-hint{font-size:11px;color:var(--text2);margin-bottom:30px}
+.vo-hangup{width:50px;height:50px;border-radius:50%;background:rgba(239,68,68,0.8);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.vo-timer{font-size:11px;color:var(--text2);margin-top:12px;font-variant-numeric:tabular-nums}
+
 /* Conversation panel */
 .conv-panel{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;z-index:2;backdrop-filter:blur(20px);transition:margin-left .3s,opacity .3s}
 .conv-panel.collapsed{margin-left:-220px;opacity:0;pointer-events:none}
@@ -265,6 +281,7 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
         <div class="mini-vinyl" id="miniVinyl"><div class="mini-vinyl-center"></div></div>
         <span class="np" id="mcText"></span>
       </div>
+      <button class="gear-btn" onclick="toggleVoiceCall()" title="Voice Call" id="callBtn" style="font-size:14px">&#128222;</button>
       <button class="gear-btn" onclick="openSettings()" title="Settings">&#9881;</button>
     </div>
   </div>
@@ -275,6 +292,16 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;hei
       <textarea id="input" placeholder="Say something..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
       <button class="send-btn" id="sendBtn" onclick="send()">Send</button>
     </div>
+  </div>
+  <!-- VOICE CALL OVERLAY -->
+  <div class="voice-overlay" id="voiceOverlay">
+    <div class="vo-status" id="voStatus">tap mic to start speaking</div>
+    <div class="vo-transcript" id="voTranscript"></div>
+    <div class="vo-waveform" id="voWaveform"></div>
+    <button class="vo-mic" id="voMic" onclick="voToggleMic()">&#127908;</button>
+    <div class="vo-hint" id="voHint">tap to speak, tap again to send</div>
+    <button class="vo-hangup" onclick="toggleVoiceCall()">&#10006;</button>
+    <div class="vo-timer" id="voTimer"></div>
   </div>
 </div>
 
@@ -595,6 +622,146 @@ async function send(){
 
 document.getElementById("input").addEventListener("input",function(){this.style.height="44px";this.style.height=Math.min(this.scrollHeight,120)+"px"});
 if(window.innerWidth<=768)document.getElementById("sidebar").classList.add("collapsed");
+
+// === VOICE CALL ===
+var voiceCallActive=false,voRecognition=null,voRecording=false,voAccumText="",voCallTimer=null,voCallSec=0,voAudio=null;
+
+// Init waveform bars
+(function(){var w=document.getElementById("voWaveform");for(var i=0;i<20;i++){var b=document.createElement("div");b.className="vbar";b.style.height="4px";w.appendChild(b)}})();
+
+function toggleVoiceCall(){
+  voiceCallActive=!voiceCallActive;
+  document.getElementById("voiceOverlay").classList.toggle("active",voiceCallActive);
+  document.getElementById("callBtn").style.background=voiceCallActive?"rgba(126,184,255,0.15)":"none";
+  if(voiceCallActive){
+    voCallSec=0;voAccumText="";
+    document.getElementById("voTranscript").innerHTML="";
+    document.getElementById("voStatus").textContent="tap mic to start speaking";
+    document.getElementById("voHint").textContent="tap to speak, tap again to send";
+    document.getElementById("voMic").classList.remove("recording","disabled");
+    voCallTimer=setInterval(function(){voCallSec++;var m=Math.floor(voCallSec/60),s=voCallSec%60;document.getElementById("voTimer").textContent="voice call "+(m<10?"0":"")+m+":"+(s<10?"0":"")+s},1000);
+  }else{
+    clearInterval(voCallTimer);
+    document.getElementById("voTimer").textContent="";
+    voStopRecognition();
+    if(voAudio){voAudio.pause();voAudio=null}
+  }
+}
+
+function voAnimateWave(active){
+  var bars=document.querySelectorAll("#voWaveform .vbar");
+  if(active){
+    var id=setInterval(function(){if(!voRecording){clearInterval(id);bars.forEach(function(b){b.style.height="4px"});return}bars.forEach(function(b){b.style.height=(Math.random()*30+4)+"px"})},100);
+  }else{bars.forEach(function(b){b.style.height="4px"})}
+}
+
+function voToggleMic(){
+  if(voRecording){
+    // Stop recording, send accumulated text
+    voRecording=false;
+    voStopRecognition();
+    document.getElementById("voMic").classList.remove("recording");
+    voAnimateWave(false);
+    if(voAccumText.trim()){
+      voSendMessage(voAccumText.trim());
+    }else{
+      document.getElementById("voStatus").textContent="didn't catch that, try again";
+      document.getElementById("voHint").textContent="tap to speak";
+    }
+    voAccumText="";
+  }else{
+    // Start recording
+    voRecording=true;voAccumText="";
+    document.getElementById("voMic").classList.add("recording");
+    document.getElementById("voStatus").textContent="listening... tap mic when done";
+    document.getElementById("voHint").textContent="speaking...";
+    document.getElementById("voTranscript").innerHTML="";
+    voAnimateWave(true);
+    voStartRecognition();
+  }
+}
+
+function voStartRecognition(){
+  if(!("webkitSpeechRecognition" in window)&&!("SpeechRecognition" in window)){document.getElementById("voStatus").textContent="speech recognition not supported";return}
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  voRecognition=new SR();
+  voRecognition.lang="zh-CN";
+  voRecognition.interimResults=true;
+  voRecognition.continuous=true; // Keep listening until manually stopped
+  voRecognition.onresult=function(e){
+    var interim="",final="";
+    for(var i=0;i<e.results.length;i++){
+      if(e.results[i].isFinal)final+=e.results[i][0].transcript;
+      else interim+=e.results[i][0].transcript;
+    }
+    voAccumText=final;
+    document.getElementById("voTranscript").innerHTML=(final||"")+'<span style="color:var(--text2)">'+(interim||"")+"</span>";
+  };
+  voRecognition.onend=function(){if(voRecording)try{voRecognition.start()}catch{}};
+  voRecognition.onerror=function(){};
+  try{voRecognition.start()}catch{}
+}
+
+function voStopRecognition(){if(voRecognition)try{voRecognition.stop()}catch{};voRecognition=null}
+
+async function voSendMessage(text){
+  document.getElementById("voMic").classList.add("disabled");
+  document.getElementById("voStatus").textContent="thinking...";
+  document.getElementById("voHint").textContent="";
+
+  // Add user message to chat
+  var ud=document.createElement("div");ud.className="message user";var umc=document.createElement("div");umc.className="msg-content";var ub=document.createElement("div");ub.className="bubble";ub.innerHTML=renderMD(text);umc.appendChild(ub);ud.appendChild(umc);ud.appendChild(makeAvatar("vi"));document.getElementById("messages").appendChild(ud);
+  chatHistory.push({role:"user",content:text});
+
+  try{
+    var r=await fetch("/api/voice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:text,history:chatHistory.slice(-20)})});
+    var d=await r.json();
+
+    if(d.noeText){
+      var bubbleHtml="";
+      if(d.enText&&d.zhText){
+        // Bilingual display
+        bubbleHtml='<div style="margin-bottom:6px">'+renderMD(d.enText)+'</div><div style="font-size:12px;color:var(--text2);border-top:1px solid var(--border);padding-top:6px;font-style:italic">'+renderMD(d.zhText)+'</div>';
+      }else{
+        bubbleHtml=renderMD(d.noeText);
+      }
+
+      var ad=document.createElement("div");ad.className="message assistant";ad.appendChild(makeAvatar("noe"));var amc=document.createElement("div");amc.className="msg-content";var ab=document.createElement("div");ab.className="bubble";ab.innerHTML=bubbleHtml;amc.appendChild(ab);
+
+      // Add play button
+      var acts=document.createElement("div");acts.className="msg-actions";
+      var vb=document.createElement("button");vb.innerHTML="&#9835; Play";vb.onclick=function(){playTTS(d.noeText,vb)};acts.appendChild(vb);amc.appendChild(acts);
+
+      ad.appendChild(amc);document.getElementById("messages").appendChild(ad);
+      document.getElementById("messages").scrollTop=999999;
+      chatHistory.push({role:"assistant",content:d.noeText});
+      saveConversation();
+    }
+
+    // Play audio
+    document.getElementById("voStatus").textContent="speaking...";
+    var bars=document.querySelectorAll("#voWaveform .vbar");
+    var speakAnim=setInterval(function(){bars.forEach(function(b){b.style.height=(Math.random()*25+4)+"px"})},100);
+
+    if(d.audioUrl){
+      voAudio=new Audio(d.audioUrl);
+      voAudio.onended=function(){clearInterval(speakAnim);bars.forEach(function(b){b.style.height="4px"});voReady()};
+      voAudio.onerror=function(){clearInterval(speakAnim);voReady()};
+      voAudio.play().catch(function(){clearInterval(speakAnim);voReady()});
+    }else{clearInterval(speakAnim);voReady()}
+  }catch(e){
+    document.getElementById("voStatus").textContent="error: "+e.message;
+    voReady();
+  }
+}
+
+function voReady(){
+  document.getElementById("voMic").classList.remove("disabled");
+  document.getElementById("voStatus").textContent="tap mic to speak";
+  document.getElementById("voHint").textContent="tap to speak, tap again to send";
+  document.getElementById("voTranscript").innerHTML="";
+}
+
 init();
 </script>
 </body>
