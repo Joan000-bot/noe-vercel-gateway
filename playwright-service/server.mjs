@@ -453,24 +453,33 @@ http.createServer(async (req, res) => {
     try {
       var ctx = cdp.contexts()[0];
       page = await ctx.newPage();
-      await page.goto(item_url, { waitUntil: "domcontentloaded", timeout: 25000 });
-      await page.waitForTimeout(4000);
+      await page.goto(item_url, { waitUntil: "networkidle", timeout: 30000 });
+      await page.waitForTimeout(5000);
 
-      // Step 1: Check if SKU selection is needed, get available options
+      // Step 1: Get all clickable text on the page to find SKU options
       var skuInfo = await page.evaluate(() => {
+        var text = document.body?.innerText || "";
         var skuGroups = [];
-        // Common SKU selectors on Taobao
-        var groups = document.querySelectorAll('.sku-item-wrapper, .tb-sku, [class*="sku"], [class*="SKU"], .J_TSaleProp, [data-property]');
-        groups.forEach(g => {
-          var label = g.previousElementSibling?.innerText || g.closest('[class*="item"]')?.querySelector('label, .label, dt')?.innerText || "";
-          var options = Array.from(g.querySelectorAll('a, li, span, button, [class*="item"]'))
-            .map(o => o.innerText.trim()).filter(t => t && t.length < 30);
-          if (options.length > 0) skuGroups.push({ label: label.trim(), options });
-        });
-        // Also try image-based SKU selectors
+
+        // Find common SKU labels and their options by scanning visible text
+        var labels = ["适用手机型号", "颜色分类", "颜色", "尺码", "尺寸", "规格", "款式", "容量", "版本"];
+        for (var label of labels) {
+          var idx = text.indexOf(label);
+          if (idx >= 0) {
+            // Get text after label, extract options
+            var after = text.substring(idx, idx + 500);
+            var lines = after.split("\n").map(s => s.trim()).filter(s => s && s.length > 1 && s.length < 40);
+            if (lines.length > 1) {
+              skuGroups.push({ label: lines[0], options: lines.slice(1, 20) });
+            }
+          }
+        }
+
+        // Fallback: look for common button-like elements
         if (!skuGroups.length) {
-          var imgs = document.querySelectorAll('[class*="sku"] img, [class*="prop"] img');
-          if (imgs.length) skuGroups.push({ label: "款式", options: Array.from(imgs).map((img, i) => img.alt || img.title || "Option " + (i+1)) });
+          var btns = document.querySelectorAll('button, [role="button"], [class*="sku"] *, [class*="prop"] *');
+          var opts = Array.from(btns).map(b => b.innerText.trim()).filter(t => t.length > 1 && t.length < 30 && !t.includes("加入") && !t.includes("购买"));
+          if (opts.length > 3) skuGroups.push({ label: "选项", options: [...new Set(opts)].slice(0, 20) });
         }
         return skuGroups;
       });
@@ -487,12 +496,20 @@ http.createServer(async (req, res) => {
       if (sku) {
         var skuParts = typeof sku === "string" ? sku.split(",").map(s => s.trim()) : [sku];
         for (var sp of skuParts) {
-          // Try clicking the SKU option
-          var skuBtn = page.locator('a:has-text("' + sp + '"), span:has-text("' + sp + '"), li:has-text("' + sp + '"), button:has-text("' + sp + '"), [title="' + sp + '"]').first();
           try {
-            await skuBtn.click({ timeout: 3000 });
-            await page.waitForTimeout(500);
-          } catch { /* SKU option not found, continue */ }
+            // Use getByText for exact or partial match, then click
+            var el = page.getByText(sp, { exact: true }).first();
+            await el.scrollIntoViewIfNeeded({ timeout: 2000 });
+            await el.click({ timeout: 3000 });
+            await page.waitForTimeout(1000);
+          } catch {
+            // Fallback: try locator with various selectors
+            try {
+              var skuBtn = page.locator('*:has-text("' + sp.replace(/"/g, '') + '")').last();
+              await skuBtn.click({ timeout: 2000 });
+              await page.waitForTimeout(500);
+            } catch { /* skip */ }
+          }
         }
         await page.waitForTimeout(1000);
       }
