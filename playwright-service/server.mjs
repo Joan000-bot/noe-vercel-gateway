@@ -445,7 +445,7 @@ http.createServer(async (req, res) => {
   }
 
   if (req.url === "/taobao/add-to-cart") {
-    var { item_url } = body;
+    var { item_url, sku } = body;
     if (!item_url) { res.writeHead(400); return res.end(JSON.stringify({ error: "item_url required" })); }
     var cdp = await getCDPBrowser();
     if (!cdp) return res.end(JSON.stringify({ success: false, error: "Persistent Chrome not running" }));
@@ -454,12 +454,65 @@ http.createServer(async (req, res) => {
       var ctx = cdp.contexts()[0];
       page = await ctx.newPage();
       await page.goto(item_url, { waitUntil: "domcontentloaded", timeout: 25000 });
-      await page.waitForTimeout(3000);
-      var cartBtn = page.locator('button:has-text("加入购物车"), a:has-text("加入购物车"), [id*="addCart"]').first();
+      await page.waitForTimeout(4000);
+
+      // Step 1: Check if SKU selection is needed, get available options
+      var skuInfo = await page.evaluate(() => {
+        var skuGroups = [];
+        // Common SKU selectors on Taobao
+        var groups = document.querySelectorAll('.sku-item-wrapper, .tb-sku, [class*="sku"], [class*="SKU"], .J_TSaleProp, [data-property]');
+        groups.forEach(g => {
+          var label = g.previousElementSibling?.innerText || g.closest('[class*="item"]')?.querySelector('label, .label, dt')?.innerText || "";
+          var options = Array.from(g.querySelectorAll('a, li, span, button, [class*="item"]'))
+            .map(o => o.innerText.trim()).filter(t => t && t.length < 30);
+          if (options.length > 0) skuGroups.push({ label: label.trim(), options });
+        });
+        // Also try image-based SKU selectors
+        if (!skuGroups.length) {
+          var imgs = document.querySelectorAll('[class*="sku"] img, [class*="prop"] img');
+          if (imgs.length) skuGroups.push({ label: "款式", options: Array.from(imgs).map((img, i) => img.alt || img.title || "Option " + (i+1)) });
+        }
+        return skuGroups;
+      });
+
+      // Step 2: If no SKU specified but options exist, return options for user to choose
+      if (skuInfo.length > 0 && !sku) {
+        var optionsText = skuInfo.map(g => g.label + ": " + g.options.join(" / ")).join("\n");
+        // Take screenshot to show options
+        var buf = await page.screenshot({ type: "jpeg", quality: 70, fullPage: false });
+        return res.end(JSON.stringify({ success: false, needsSku: true, skuOptions: skuInfo, message: "请选择规格:\n" + optionsText, screenshot: buf.toString("base64") }));
+      }
+
+      // Step 3: Select SKU if provided
+      if (sku) {
+        var skuParts = typeof sku === "string" ? sku.split(",").map(s => s.trim()) : [sku];
+        for (var sp of skuParts) {
+          // Try clicking the SKU option
+          var skuBtn = page.locator('a:has-text("' + sp + '"), span:has-text("' + sp + '"), li:has-text("' + sp + '"), button:has-text("' + sp + '"), [title="' + sp + '"]').first();
+          try {
+            await skuBtn.click({ timeout: 3000 });
+            await page.waitForTimeout(500);
+          } catch { /* SKU option not found, continue */ }
+        }
+        await page.waitForTimeout(1000);
+      }
+
+      // Step 4: Click add to cart
+      var cartBtn = page.locator('button:has-text("加入购物车"), a:has-text("加入购物车"), [id*="addCart"], [class*="addCart"], [class*="add-cart"]').first();
+      await cartBtn.scrollIntoViewIfNeeded();
       await cartBtn.click({ timeout: 5000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
+
+      // Step 5: Handle any popup confirmation
+      var confirmBtn = page.locator('button:has-text("确定"), button:has-text("确认"), button:has-text("OK")').first();
+      try { await confirmBtn.click({ timeout: 2000 }); } catch { /* no confirm popup */ }
+      await page.waitForTimeout(1000);
+
+      // Step 6: Take screenshot and check result
+      var buf = await page.screenshot({ type: "jpeg", quality: 70, fullPage: false });
       var content = await page.evaluate(() => (document.body?.innerText || "").substring(0, 5000));
-      res.end(JSON.stringify({ success: true, message: "已加入购物车", data: { content } }));
+      var hasSuccess = content.includes("成功") || content.includes("购物车") || content.includes("已加入");
+      res.end(JSON.stringify({ success: hasSuccess, message: hasSuccess ? "已加入购物车" : "可能未成功，请检查截图", data: { content: content.substring(0, 2000) }, screenshot: buf.toString("base64") }));
     } catch (e) { res.end(JSON.stringify({ success: false, error: "加入购物车失败: " + e.message })); }
     finally { if (page) await page.close().catch(() => {}); }
     return;
