@@ -71,6 +71,9 @@ var tools = [
   { name: "amap_route", description: "用高德地图规划路线（步行/驾车/公交）", inputSchema: { type: "object", properties: { origin: { type: "string", description: "起点坐标（经度,纬度）或地名" }, destination: { type: "string", description: "终点坐标（经度,纬度）或地名" }, mode: { type: "string", description: "出行方式: walking/driving/transit，默认driving" }, city: { type: "string", description: "城市（公交路线需要）" } }, required: ["origin", "destination"] } },
   { name: "amap_geocode", description: "将地址转换为坐标（地理编码）", inputSchema: { type: "object", properties: { address: { type: "string", description: "地址" }, city: { type: "string", description: "城市" } }, required: ["address"] } },
   { name: "amap_weather", description: "查询城市天气（高德）", inputSchema: { type: "object", properties: { city: { type: "string", description: "城市名" } }, required: ["city"] } },
+  { name: "search_taobao", description: "在淘宝搜索商品", inputSchema: { type: "object", properties: { query: { type: "string", description: "搜索关键词" } }, required: ["query"] } },
+  { name: "browse_taobao_item", description: "查看淘宝商品详情（价格、描述、评价）", inputSchema: { type: "object", properties: { item_url: { type: "string", description: "商品链接" } }, required: ["item_url"] } },
+  { name: "taobao_add_to_cart", description: "将淘宝商品加入购物车（不会自动付款）", inputSchema: { type: "object", properties: { item_url: { type: "string", description: "商品链接" } }, required: ["item_url"] } },
   { name: "search_ubereats", description: "在Uber Eats搜索餐厅和食物", inputSchema: { type: "object", properties: { query: { type: "string", description: "搜索关键词，如 pizza, bubble tea, ramen" } }, required: ["query"] } },
   { name: "browse_ubereats_store", description: "浏览Uber Eats上的一家餐厅的菜单", inputSchema: { type: "object", properties: { store_url: { type: "string", description: "餐厅页面URL" } }, required: ["store_url"] } },
   { name: "ubereats_add_to_cart", description: "将食物加入Uber Eats购物车", inputSchema: { type: "object", properties: { item_name: { type: "string", description: "菜品名称" }, store_url: { type: "string", description: "餐厅URL（如果还没在该店铺页面）" } }, required: ["item_name"] } },
@@ -281,6 +284,32 @@ async function executeTool(name, args) {
       if (data.status !== "1" || !data.lives?.length) return { content: [{ type: "text", text: "天气查询失败" }] };
       var w = data.lives[0];
       return { content: [{ type: "text", text: "🌤️ " + w.province + w.city + "\n天气: " + w.weather + "\n温度: " + w.temperature + "°C\n风向: " + w.winddirection + " " + w.windpower + "级\n湿度: " + w.humidity + "%" }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+
+  // Taobao
+  if (name === "search_taobao") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/taobao/search", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ query: args.query }) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "搜索失败: " + data.error }] };
+      var out = "🛒 淘宝搜索: " + args.query + "\n\n" + data.data.content;
+      if (data.data.links?.length) out += "\n\n商品链接:\n" + data.data.links.map(l => "- " + l.text + "\n  " + l.href).join("\n");
+      return { content: [{ type: "text", text: out.substring(0, 15000) }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "browse_taobao_item") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/taobao/item", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ item_url: args.item_url }) });
+      var data = await r.json(); if (!data.success) return { content: [{ type: "text", text: "无法打开商品: " + data.error }] };
+      return { content: [{ type: "text", text: "📦 商品详情:\n\n" + data.data.content.substring(0, 15000) }] };
+    } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
+  }
+  if (name === "taobao_add_to_cart") {
+    try {
+      var r = await fetch(PLAYWRIGHT_API_URL + "/taobao/add-to-cart", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + PLAYWRIGHT_API_KEY }, body: JSON.stringify({ item_url: args.item_url }) });
+      var data = await r.json();
+      if (data.success) return { content: [{ type: "text", text: "✅ 已加入购物车！请在淘宝确认付款。" }] };
+      return { content: [{ type: "text", text: "❌ " + data.error }] };
     } catch (e) { return { content: [{ type: "text", text: "错误: " + e.message }] }; }
   }
 

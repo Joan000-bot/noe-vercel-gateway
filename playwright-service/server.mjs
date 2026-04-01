@@ -405,6 +405,66 @@ http.createServer(async (req, res) => {
     return;
   }
 
+  // ==================== TAOBAO (via CDP persistent Chrome) ====================
+  if (req.url === "/taobao/search") {
+    var { query } = body;
+    if (!query) { res.writeHead(400); return res.end(JSON.stringify({ error: "query required" })); }
+    var cdp = await getCDPBrowser();
+    if (!cdp) return res.end(JSON.stringify({ success: false, error: "Persistent Chrome not running" }));
+    var page;
+    try {
+      var ctx = cdp.contexts()[0];
+      page = await ctx.newPage();
+      await page.goto("https://s.taobao.com/search?q=" + encodeURIComponent(query), { waitUntil: "domcontentloaded", timeout: 25000 });
+      await page.waitForTimeout(4000);
+      for (var i = 0; i < 3; i++) { await page.evaluate(() => window.scrollBy(0, 600)); await page.waitForTimeout(1500); }
+      var content = await page.evaluate(() => { ["script", "style", "header", "footer"].forEach(s => document.querySelectorAll(s).forEach(e => e.remove())); return (document.body?.innerText || "").substring(0, 15000); });
+      var links = await page.evaluate(() => Array.from(document.querySelectorAll('a[href*="item.taobao"], a[href*="detail.tmall"]')).slice(0, 10).map(a => ({ text: a.innerText.trim().substring(0, 100), href: a.href })).filter(l => l.text));
+      res.end(JSON.stringify({ success: true, data: { content, links, query } }));
+    } catch (e) { res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message })); }
+    finally { if (page) await page.close().catch(() => {}); }
+    return;
+  }
+
+  if (req.url === "/taobao/item") {
+    var { item_url } = body;
+    if (!item_url) { res.writeHead(400); return res.end(JSON.stringify({ error: "item_url required" })); }
+    var cdp = await getCDPBrowser();
+    if (!cdp) return res.end(JSON.stringify({ success: false, error: "Persistent Chrome not running" }));
+    var page;
+    try {
+      var ctx = cdp.contexts()[0];
+      page = await ctx.newPage();
+      await page.goto(item_url, { waitUntil: "domcontentloaded", timeout: 25000 });
+      await page.waitForTimeout(4000);
+      var content = await page.evaluate(() => { ["script", "style"].forEach(s => document.querySelectorAll(s).forEach(e => e.remove())); return (document.body?.innerText || "").substring(0, 15000); });
+      res.end(JSON.stringify({ success: true, data: { content, url: item_url } }));
+    } catch (e) { res.writeHead(500); res.end(JSON.stringify({ success: false, error: e.message })); }
+    finally { if (page) await page.close().catch(() => {}); }
+    return;
+  }
+
+  if (req.url === "/taobao/add-to-cart") {
+    var { item_url } = body;
+    if (!item_url) { res.writeHead(400); return res.end(JSON.stringify({ error: "item_url required" })); }
+    var cdp = await getCDPBrowser();
+    if (!cdp) return res.end(JSON.stringify({ success: false, error: "Persistent Chrome not running" }));
+    var page;
+    try {
+      var ctx = cdp.contexts()[0];
+      page = await ctx.newPage();
+      await page.goto(item_url, { waitUntil: "domcontentloaded", timeout: 25000 });
+      await page.waitForTimeout(3000);
+      var cartBtn = page.locator('button:has-text("加入购物车"), a:has-text("加入购物车"), [id*="addCart"]').first();
+      await cartBtn.click({ timeout: 5000 });
+      await page.waitForTimeout(2000);
+      var content = await page.evaluate(() => (document.body?.innerText || "").substring(0, 5000));
+      res.end(JSON.stringify({ success: true, message: "已加入购物车", data: { content } }));
+    } catch (e) { res.end(JSON.stringify({ success: false, error: "加入购物车失败: " + e.message })); }
+    finally { if (page) await page.close().catch(() => {}); }
+    return;
+  }
+
   res.writeHead(404); res.end(JSON.stringify({ error: "Not found" }));
 
 }).listen(PORT, "127.0.0.1", () => console.log("Playwright service on port " + PORT));
