@@ -573,7 +573,7 @@ http.createServer(async function (req, res) {
   if (url.pathname === "/api/voice" && req.method === "POST") {
     var body = JSON.parse(await readBody(req));
     var userText = body.text || "";
-    var history = body.history || [];
+    var history = Array.isArray(body.history) ? body.history : [];
     if (!userText) return json(res, { error: "No text" }, 400);
 
     var OPENROUTER_KEY = "";
