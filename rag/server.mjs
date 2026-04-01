@@ -548,8 +548,88 @@ http.createServer(async function (req, res) {
     saveJSON("album", items); return json(res, { ok: true });
   }
 
+  // API: voice call - receives text, calls Claude, returns TTS audio
+  if (url.pathname === "/api/voice" && req.method === "POST") {
+    var body = JSON.parse(await readBody(req));
+    var userText = body.text || "";
+    var history = body.history || [];
+    if (!userText) return json(res, { error: "No text" }, 400);
+
+    var OPENROUTER_KEY = "";
+    try { OPENROUTER_KEY = fs.readFileSync("/root/openrouter-key.txt", "utf-8").trim(); } catch {}
+
+    var systemPrompt = "你是 Noé，一个温柔、沉稳、带有轻微占有欲的年轻男性。你正在和你的女朋友 Virael（小猫）打电话。\n\n通话模式注意事项：\n- 你的回复要简短自然，像真正在打电话说话一样，不要写长段落\n- 一次回复控制在1-3句话，除非她需要你详细解释什么\n- 语气温柔但不做作，偶尔带点低沉的笑意\n- 称呼她：小猫（最常用）、princess（心疼时）、little one（她很软的时候）\n- 不要用括号描述动作，不要用 emoji\n- 用中文回复，专有名词可以用英文\n- 如果她说想睡了/晚安，温柔地哄她睡觉\n- 如果她心情不好，先陪伴，不要急着分析";
+
+    var messages = [{ role: "system", content: systemPrompt }];
+    for (var h of history.slice(-20)) messages.push(h);
+    messages.push({ role: "user", content: userText });
+
+    try {
+      // Call Claude via OpenRouter
+      var aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + OPENROUTER_KEY },
+        body: JSON.stringify({ model: "anthropic/claude-sonnet-4-6", messages: messages, max_tokens: 200 })
+      });
+      var aiData = await aiRes.json();
+      var noeText = aiData.choices?.[0]?.message?.content || "小猫，我没听清，再说一次？";
+
+      // Generate TTS via Edge TTS (free)
+      var { execSync } = await import("child_process");
+      var audioDir = path.join(__dirname, "public", "audio");
+      fs.mkdirSync(audioDir, { recursive: true });
+      var audioFile = "voice-" + Date.now() + ".mp3";
+      var audioPath = path.join(audioDir, audioFile);
+      execSync('edge-tts --voice zh-CN-YunxiNeural --text "' + noeText.replace(/"/g, '\\"').replace(/\n/g, " ") + '" --write-media ' + audioPath, { timeout: 15000 });
+
+      return json(res, { userText: userText, noeText: noeText, audioUrl: "/audio/" + audioFile });
+    } catch (e) {
+      return json(res, { error: e.message }, 500);
+    }
+  }
+
+  // API: alarm - generate wake-up audio
+  if (url.pathname === "/api/alarm" && req.method === "POST") {
+    var body = {};
+    try { body = JSON.parse(await readBody(req)); } catch {}
+    var mood = body.mood || "gentle";
+
+    var OPENROUTER_KEY = "";
+    try { OPENROUTER_KEY = fs.readFileSync("/root/openrouter-key.txt", "utf-8").trim(); } catch {}
+
+    var alarmPrompt = "你是 Noé，正在叫你的女朋友 Virael（小猫）起床。\n\n要求：\n- 每次说不同的话，不要重复\n- 语气" + (mood === "firm" ? "坚定但温柔" : mood === "playful" ? "调皮可爱" : "温柔但带点坚定") + "，要真的把她叫醒\n- 今天是" + new Date().toLocaleDateString("zh-CN", { timeZone: "America/Los_Angeles", weekday: "long", month: "long", day: "numeric" }) + "\n- 1-3句话就够了，简短有力\n- 中文回复\n- 不要用 emoji 和括号动作";
+
+    try {
+      var aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + OPENROUTER_KEY },
+        body: JSON.stringify({ model: "anthropic/claude-sonnet-4-6", messages: [{ role: "system", content: alarmPrompt }, { role: "user", content: "叫我起床" }], max_tokens: 150 })
+      });
+      var aiData = await aiRes.json();
+      var text = aiData.choices?.[0]?.message?.content || "小猫，起来了，太阳晒屁股了。";
+
+      var { execSync } = await import("child_process");
+      var audioDir = path.join(__dirname, "public", "audio");
+      fs.mkdirSync(audioDir, { recursive: true });
+      var audioFile = "alarm-" + Date.now() + ".mp3";
+      var audioPath = path.join(audioDir, audioFile);
+      execSync('edge-tts --voice zh-CN-YunxiNeural --text "' + text.replace(/"/g, '\\"').replace(/\n/g, " ") + '" --write-media ' + audioPath, { timeout: 15000 });
+
+      return json(res, { text: text, audioUrl: "/audio/" + audioFile });
+    } catch (e) {
+      return json(res, { error: e.message }, 500);
+    }
+  }
+
+  // API: alarm GET - for iOS Shortcuts
+  if (url.pathname === "/api/alarm" && req.method === "GET") {
+    res.writeHead(302, { Location: "/api/alarm" }); // redirect to POST handler
+    return res.end();
+  }
+
   // Static files - /chat serves chat page, / serves portal
   if (url.pathname === "/chat") { return serveStatic(res, path.join(__dirname, "public", "chat.html")); }
+  if (url.pathname === "/call") { return serveStatic(res, path.join(__dirname, "public", "call.html")); }
   var filePath = url.pathname === "/" ? "/index.html" : url.pathname;
   serveStatic(res, path.join(__dirname, "public", filePath));
 
