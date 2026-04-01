@@ -612,7 +612,7 @@ http.createServer(async function (req, res) {
         var aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + OPENROUTER_KEY },
-          body: JSON.stringify({ model: "anthropic/claude-sonnet-4-6", messages: messages, max_tokens: 200 })
+          body: JSON.stringify({ model: "anthropic/claude-haiku-4-5-20251001", messages: messages, max_tokens: 200 })
         });
         var aiData = await aiRes.json();
         noeText = aiData.choices?.[0]?.message?.content || "小猫，我没听清，再说一次？";
