@@ -13,17 +13,17 @@
 body{font-family:'Crimson Pro','Noto Serif SC',serif;height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 
 /* === IDLE === */
-.idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(180deg,#fef0f0 0%,#fde8e8 30%,#f5d5d5 100%);transition:opacity .5s;z-index:2}
+.idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(180deg,#0a0f1e 0%,#0d1528 30%,#111d35 100%);transition:opacity .5s;z-index:2}
 .idle.hidden{opacity:0;pointer-events:none}
-.idle .brand{font-size:16px;color:rgba(180,120,120,0.5);letter-spacing:4px;margin-bottom:60px;font-weight:300}
-.call-circle{width:120px;height:120px;border-radius:50%;background:linear-gradient(135deg,#f5b8b8,#e8a0a0);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 40px rgba(200,130,130,0.3);animation:breathe 4s ease-in-out infinite;-webkit-tap-highlight-color:transparent}
-.call-circle span{font-size:40px;color:#fff;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))}
-@keyframes breathe{0%,100%{transform:scale(1);box-shadow:0 8px 40px rgba(200,130,130,0.3)}50%{transform:scale(1.05);box-shadow:0 12px 50px rgba(200,130,130,0.4)}}
-.idle .tap{font-size:14px;color:rgba(180,120,120,0.6);margin-top:30px;font-style:italic;letter-spacing:1px}
-.idle .sub{font-size:12px;color:rgba(180,120,120,0.4);margin-top:8px;font-style:italic}
+.idle .brand{font-size:16px;color:rgba(124,158,217,0.5);letter-spacing:4px;margin-bottom:60px;font-weight:300}
+.call-circle{width:120px;height:120px;border-radius:50%;background:linear-gradient(135deg,#4a7ab5,#2a5090);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 40px rgba(60,100,180,0.3);animation:breathe 4s ease-in-out infinite;-webkit-tap-highlight-color:transparent}
+.call-circle span{font-size:40px;color:#fff;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.2))}
+@keyframes breathe{0%,100%{transform:scale(1);box-shadow:0 8px 40px rgba(60,100,180,0.3)}50%{transform:scale(1.05);box-shadow:0 12px 50px rgba(80,130,210,0.4)}}
+.idle .tap{font-size:14px;color:rgba(124,158,217,0.6);margin-top:30px;font-style:italic;letter-spacing:1px}
+.idle .sub{font-size:12px;color:rgba(124,158,217,0.35);margin-top:8px;font-style:italic}
 
 /* === ACTIVE CALL === */
-.active-call{position:absolute;inset:0;display:none;flex-direction:column;background:linear-gradient(180deg,#fef0f0 0%,#f8e0e0 50%,#f0d0d0 100%);z-index:1}
+.active-call{position:absolute;inset:0;display:none;flex-direction:column;background:linear-gradient(180deg,#0a0f1e 0%,#0e1630 50%,#121e3a 100%);z-index:1}
 .active-call.show{display:flex}
 
 /* Transcript area */
@@ -31,24 +31,24 @@ body{font-family:'Crimson Pro','Noto Serif SC',serif;height:100vh;height:100dvh;
 .transcript-area::-webkit-scrollbar{display:none}
 .t-block{margin-bottom:16px;animation:fadeIn .3s}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.t-block .zh{font-size:13px;color:rgba(140,100,100,0.5);margin-bottom:4px;font-style:italic}
-.t-block .en{font-size:16px;color:rgba(80,50,50,0.85);line-height:1.6}
+.t-block .zh{font-size:13px;color:rgba(124,158,217,0.45);margin-bottom:4px;font-style:italic}
+.t-block .en{font-size:16px;color:rgba(200,215,240,0.85);line-height:1.6}
 .t-block.user{text-align:right}
-.t-block.user .en{color:rgba(80,50,50,0.5);font-size:14px}
+.t-block.user .en{color:rgba(200,215,240,0.5);font-size:14px}
 
 /* Bottom section */
 .call-bottom{padding:16px 24px;display:flex;flex-direction:column;align-items:center;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
-.brand-bottom{font-size:13px;color:rgba(180,120,120,0.4);letter-spacing:3px;margin-bottom:12px;font-weight:300}
-.status{font-size:12px;color:rgba(180,120,120,0.6);margin-bottom:16px;font-style:italic;min-height:18px}
+.brand-bottom{font-size:13px;color:rgba(124,158,217,0.35);letter-spacing:3px;margin-bottom:12px;font-weight:300}
+.status{font-size:12px;color:rgba(124,158,217,0.55);margin-bottom:16px;font-style:italic;min-height:18px}
 
 /* Controls */
 .ctrl{display:flex;align-items:center;gap:30px}
-.mic-circle{width:60px;height:60px;border-radius:50%;background:rgba(240,180,180,0.3);border:2px solid rgba(220,160,160,0.4);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;transition:all .3s;-webkit-tap-highlight-color:transparent;color:rgba(150,100,100,0.6)}
-.mic-circle.recording{background:rgba(255,100,100,0.15);border-color:rgba(255,80,80,0.5);color:#e55;animation:mpulse 1.5s infinite}
+.mic-circle{width:60px;height:60px;border-radius:50%;background:rgba(60,100,180,0.15);border:2px solid rgba(80,120,200,0.3);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;transition:all .3s;-webkit-tap-highlight-color:transparent;color:rgba(124,158,217,0.6)}
+.mic-circle.recording{background:rgba(100,160,255,0.15);border-color:rgba(100,160,255,0.5);color:#7cb8ff;animation:mpulse 1.5s infinite}
 .mic-circle.disabled{opacity:0.3;pointer-events:none}
-@keyframes mpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,100,100,0.2)}50%{box-shadow:0 0 0 12px rgba(255,100,100,0)}}
-.hangup{width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#e88,#d66);border:none;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 15px rgba(200,80,80,0.3)}
-.timer{font-size:11px;color:rgba(180,120,120,0.4);margin-top:10px;font-variant-numeric:tabular-nums}
+@keyframes mpulse{0%,100%{box-shadow:0 0 0 0 rgba(100,160,255,0.2)}50%{box-shadow:0 0 0 12px rgba(100,160,255,0)}}
+.hangup{width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#e66,#c44);border:none;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 15px rgba(200,60,60,0.3)}
+.timer{font-size:11px;color:rgba(124,158,217,0.35);margin-top:10px;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
