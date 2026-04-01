@@ -111,7 +111,9 @@ function toggleMic(){
     document.getElementById("mic").classList.add("recording");
     document.getElementById("status").textContent="listening... tap when done";
     navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      mediaRec=new MediaRecorder(stream,{mimeType:"audio/webm"});
+      // iOS Safari only supports audio/mp4, Chrome supports audio/webm
+      var mimeType=MediaRecorder.isTypeSupported("audio/webm")?"audio/webm":"audio/mp4";
+      mediaRec=new MediaRecorder(stream,{mimeType:mimeType});
       mediaRec.ondataavailable=function(e){if(e.data.size>0)audioChunks.push(e.data)};
       mediaRec.onstop=function(){
         stream.getTracks().forEach(function(t){t.stop()});
@@ -133,10 +135,11 @@ async function processAudio(){
   // Upload audio for STT
   var blob=new Blob(audioChunks,{type:"audio/webm"});
   try{
-    var sttRes=await fetch("/api/stt",{method:"POST",body:blob});
+    document.getElementById("status").textContent="uploading audio ("+Math.round(blob.size/1024)+"kb)...";
+    var sttRes=await fetch("/api/stt",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
     var sttData=await sttRes.json();
     if(!sttData.text){
-      document.getElementById("status").textContent="didn't catch that";
+      document.getElementById("status").textContent="didn't catch that"+(sttData.error?" - "+sttData.error:"");
       document.getElementById("mic").classList.remove("disabled");
       return;
     }

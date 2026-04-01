@@ -555,7 +555,8 @@ http.createServer(async function (req, res) {
     var buf = Buffer.concat(chunks);
     var audioDir = path.join(__dirname, "data", "stt");
     fs.mkdirSync(audioDir, { recursive: true });
-    var tmpFile = path.join(audioDir, "stt-" + Date.now() + ".webm");
+    var ext = (req.headers["content-type"] || "").includes("mp4") ? ".mp4" : ".webm";
+    var tmpFile = path.join(audioDir, "stt-" + Date.now() + ext);
     fs.writeFileSync(tmpFile, buf);
     try {
       var { execSync } = await import("child_process");
