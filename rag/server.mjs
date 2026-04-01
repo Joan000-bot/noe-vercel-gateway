@@ -594,14 +594,29 @@ http.createServer(async function (req, res) {
     messages.push({ role: "user", content: userText });
 
     try {
-      // Call Claude via OpenRouter
-      var aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + OPENROUTER_KEY },
-        body: JSON.stringify({ model: "anthropic/claude-sonnet-4-6", messages: messages, max_tokens: 200 })
-      });
-      var aiData = await aiRes.json();
-      var noeText = aiData.choices?.[0]?.message?.content || "小猫，我没听清，再说一次？";
+      // Call Claude - try Anthropic API first (faster), fallback to OpenRouter
+      var ANTHROPIC_KEY = "";
+      try { ANTHROPIC_KEY = fs.readFileSync("/root/anthropic-key.txt", "utf-8").trim(); } catch {}
+
+      var noeText = "";
+      if (ANTHROPIC_KEY) {
+        var aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 200, system: messages[0].content, messages: messages.slice(1) })
+        });
+        var aiData = await aiRes.json();
+        noeText = aiData.content?.[0]?.text || "";
+      }
+      if (!noeText) {
+        var aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + OPENROUTER_KEY },
+          body: JSON.stringify({ model: "anthropic/claude-sonnet-4-6", messages: messages, max_tokens: 200 })
+        });
+        var aiData = await aiRes.json();
+        noeText = aiData.choices?.[0]?.message?.content || "小猫，我没听清，再说一次？";
+      }
 
       // Split bilingual response
       var zhText = "";
