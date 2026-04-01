@@ -81,11 +81,9 @@ var history=[],timerSec=0,timerInt=null,recording=false,mediaRec=null,audioChunk
 function startCall(){
   document.getElementById("idle").classList.add("hidden");
   document.getElementById("call").classList.add("show");
-  document.getElementById("status").textContent="connected";
+  document.getElementById("status").textContent="tap mic to speak";
   timerSec=0;
   timerInt=setInterval(function(){timerSec++;var m=Math.floor(timerSec/60),s=timerSec%60;document.getElementById("timer").textContent=(m<10?"0":"")+m+":"+(s<10?"0":"")+s},1000);
-  // Initial greeting
-  setTimeout(function(){sendText("你好呀")},500);
 }
 
 function addTranscript(role,text,zhText){
