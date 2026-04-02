@@ -573,7 +573,9 @@ http.createServer(async function (req, res) {
       execSync("ffmpeg -y -i " + tmpFile + " -ar 16000 -ac 1 " + wavFile + " 2>/dev/null", { timeout: 10000 });
       var sttInput = fs.existsSync(wavFile) ? wavFile : tmpFile;
       var result = execSync("python3 /root/stt.py " + sttInput + " 2>&1", { timeout: 30000 }).toString().trim();
-      try { fs.unlinkSync(tmpFile); fs.unlinkSync(wavFile); } catch {}
+      console.log("STT result:", result, "file:", sttInput, "size:", audioBuf.length);
+      try { fs.unlinkSync(tmpFile); } catch {}
+      try { fs.unlinkSync(wavFile); } catch {}
       var parsed = JSON.parse(result);
       return json(res, parsed);
     } catch (e) {
