@@ -568,8 +568,12 @@ http.createServer(async function (req, res) {
     fs.writeFileSync(tmpFile, audioBuf);
     try {
       var { execSync } = await import("child_process");
-      var result = execSync("python3 /root/stt.py " + tmpFile + " 2>&1", { timeout: 30000 }).toString().trim();
-      // Keep file for debug, don't delete
+      // Convert to wav first for better Whisper compatibility
+      var wavFile = tmpFile.replace(/\.\w+$/, ".wav");
+      execSync("ffmpeg -y -i " + tmpFile + " -ar 16000 -ac 1 " + wavFile + " 2>/dev/null", { timeout: 10000 });
+      var sttInput = fs.existsSync(wavFile) ? wavFile : tmpFile;
+      var result = execSync("python3 /root/stt.py " + sttInput + " 2>&1", { timeout: 30000 }).toString().trim();
+      try { fs.unlinkSync(tmpFile); fs.unlinkSync(wavFile); } catch {}
       var parsed = JSON.parse(result);
       return json(res, parsed);
     } catch (e) {
