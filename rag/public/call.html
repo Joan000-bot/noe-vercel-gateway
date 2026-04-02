@@ -72,6 +72,7 @@ body{font-family:'Crimson Pro','Noto Serif SC',serif;height:100vh;height:100dvh;
       <div class="mic-circle" id="mic" onclick="toggleMic()">🎤</div>
       <button class="hangup" onclick="endCall()">📞</button>
     </div>
+    <button onclick="testRecord()" style="margin-top:10px;padding:8px 16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:12px;cursor:pointer">Test: Record 3s & Upload</button>
     <div class="timer" id="timer"></div>
   </div>
 </div>
@@ -194,6 +195,29 @@ async function sendText(text){
     addTranscript("noe","Signal lost... ("+e.message+")");
     ready();
   }
+}
+
+async function testRecord(){
+  dbg("test: requesting mic...");
+  try{
+    var stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    dbg("test: recording 3 seconds...");
+    var chunks=[];
+    var rec=new MediaRecorder(stream);
+    rec.ondataavailable=function(e){chunks.push(e.data);dbg("test: chunk "+chunks.length+" ("+e.data.size+"b)")};
+    rec.onstop=async function(){
+      stream.getTracks().forEach(function(t){t.stop()});
+      var blob=new Blob(chunks);
+      dbg("test: uploading "+blob.size+" bytes...");
+      try{
+        var r=await fetch("/api/stt",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
+        var d=await r.json();
+        dbg("test result: "+JSON.stringify(d));
+      }catch(e){dbg("test upload error: "+e.message)}
+    };
+    rec.start();
+    setTimeout(function(){rec.stop();dbg("test: stopped")},3000);
+  }catch(e){dbg("test mic error: "+e.message)}
 }
 
 function ready(){
