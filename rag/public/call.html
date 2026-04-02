@@ -101,57 +101,51 @@ function addTranscript(role,text,zhText){
   document.getElementById("transcripts").scrollTop=999999;
 }
 
+var micStream=null,micRec=null;
+
 function toggleMic(){
   if(recording){
-    // Stop recording and process
+    // Stop
     recording=false;
     document.getElementById("mic").classList.remove("recording");
-    if(mediaRec&&mediaRec.state==="recording")mediaRec.stop();
+    dbg("processing...");
+    if(micRec)micRec.stop();
   }else{
-    // Start recording
+    // Start - use same method as testRecord which works
     recording=true;
     audioChunks=[];
     document.getElementById("mic").classList.add("recording");
     document.getElementById("liveText").innerHTML="";
     navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      var opts={};
-      try{["audio/webm","audio/mp4","audio/ogg"].forEach(function(m){if(!opts.mimeType&&MediaRecorder.isTypeSupported(m))opts.mimeType=m})}catch{}
-      try{mediaRec=new MediaRecorder(stream,opts)}catch(e){mediaRec=new MediaRecorder(stream)}
-      mediaRec.ondataavailable=function(e){if(e.data&&e.data.size>0)audioChunks.push(e.data)};
-      mediaRec.onstop=function(){
+      micStream=stream;
+      micRec=new MediaRecorder(stream);
+      micRec.ondataavailable=function(e){audioChunks.push(e.data)};
+      micRec.onstop=async function(){
         stream.getTracks().forEach(function(t){t.stop()});
-        dbg("stopped, "+audioChunks.length+" chunks, "+audioChunks.reduce(function(s,c){return s+c.size},0)+" bytes");
-        if(audioChunks.length&&audioChunks.reduce(function(s,c){return s+c.size},0)>100)processAudio();
-        else dbg("no audio captured ("+audioChunks.length+" chunks)");
+        if(!audioChunks.length){dbg("no audio");return}
+        var blob=new Blob(audioChunks);
+        dbg("transcribing ("+Math.round(blob.size/1024)+"kb)...");
+        document.getElementById("mic").classList.add("disabled");
+        try{
+          var r=await fetch("/api/stt",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
+          var d=await r.json();
+          if(d.text){
+            document.getElementById("liveText").innerHTML=d.text;
+            addTranscript("user",d.text);
+            sendText(d.text);
+          }else{
+            dbg("didn't catch that");
+            document.getElementById("mic").classList.remove("disabled");
+          }
+        }catch(e){dbg("error: "+e.message);document.getElementById("mic").classList.remove("disabled")}
       };
-      mediaRec.start(1000);
+      micRec.start();
       dbg("listening... tap mic when done");
     }).catch(function(e){
       dbg("mic error: "+e.message);
       recording=false;
       document.getElementById("mic").classList.remove("recording");
     });
-  }
-}
-
-async function processAudio(){
-  var blob=new Blob(audioChunks,{type:audioChunks[0]?.type||"audio/webm"});
-  dbg("transcribing ("+Math.round(blob.size/1024)+"kb)...");
-  document.getElementById("mic").classList.add("disabled");
-  try{
-    var r=await fetch("/api/stt",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
-    var d=await r.json();
-    if(d.text){
-      document.getElementById("liveText").innerHTML=d.text;
-      addTranscript("user",d.text);
-      sendText(d.text);
-    }else{
-      dbg("didn't catch that"+(d.error?" - "+d.error:""));
-      document.getElementById("mic").classList.remove("disabled");
-    }
-  }catch(e){
-    dbg("error: "+e.message);
-    document.getElementById("mic").classList.remove("disabled");
   }
 }
 
