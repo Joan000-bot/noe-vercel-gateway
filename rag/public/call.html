@@ -119,10 +119,11 @@ function toggleMic(){
       mediaRec.ondataavailable=function(e){if(e.data&&e.data.size>0)audioChunks.push(e.data)};
       mediaRec.onstop=function(){
         stream.getTracks().forEach(function(t){t.stop()});
-        if(audioChunks.length)processAudio();
-        else dbg("no audio captured");
+        dbg("stopped, "+audioChunks.length+" chunks, "+audioChunks.reduce(function(s,c){return s+c.size},0)+" bytes");
+        if(audioChunks.length&&audioChunks.reduce(function(s,c){return s+c.size},0)>100)processAudio();
+        else dbg("no audio captured ("+audioChunks.length+" chunks)");
       };
-      mediaRec.start(500);
+      mediaRec.start(1000);
       dbg("listening... tap mic when done");
     }).catch(function(e){
       dbg("mic error: "+e.message);
