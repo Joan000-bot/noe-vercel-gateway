@@ -76,7 +76,10 @@ body{font-family:'Crimson Pro','Noto Serif SC',serif;height:100vh;height:100dvh;
 </div>
 
 <script>
-var history=[],timerSec=0,timerInt=null,recording=false,mediaRec=null,audioChunks=[];
+var history=[],timerSec=0,timerInt=null,recording=false,mediaRec=null,audioChunks=[],audioStream=null;
+
+// Debug helper
+function dbg(msg){document.getElementById("status").textContent=msg;console.log("[call]",msg)}
 
 function startCall(){
   document.getElementById("idle").classList.add("hidden");
@@ -109,19 +112,30 @@ function toggleMic(){
     recording=true;
     audioChunks=[];
     document.getElementById("mic").classList.add("recording");
-    document.getElementById("status").textContent="listening... tap when done";
+    dbg("requesting mic...");
     navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      // iOS Safari only supports audio/mp4, Chrome supports audio/webm
-      var mimeType=MediaRecorder.isTypeSupported("audio/webm")?"audio/webm":"audio/mp4";
-      mediaRec=new MediaRecorder(stream,{mimeType:mimeType});
-      mediaRec.ondataavailable=function(e){if(e.data.size>0)audioChunks.push(e.data)};
+      audioStream=stream;
+      // Detect supported mime type
+      var opts={};
+      try{
+        ["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/aac","audio/ogg"].forEach(function(m){
+          if(!opts.mimeType&&MediaRecorder.isTypeSupported(m))opts.mimeType=m;
+        });
+      }catch(e){}
+      dbg("listening... ("+(opts.mimeType||"default")+")");
+      try{mediaRec=new MediaRecorder(stream,opts)}catch(e){mediaRec=new MediaRecorder(stream)}
+      mediaRec.ondataavailable=function(e){if(e.data&&e.data.size>0)audioChunks.push(e.data)};
+      mediaRec.onerror=function(e){dbg("rec error: "+(e.error?e.error.name:"unknown"))};
       mediaRec.onstop=function(){
         stream.getTracks().forEach(function(t){t.stop()});
-        if(audioChunks.length)processAudio();
+        setTimeout(function(){
+          if(audioChunks.length){dbg("got "+audioChunks.length+" chunks");processAudio()}
+          else dbg("no audio data captured")
+        },300);
       };
-      mediaRec.start();
-    }).catch(function(){
-      document.getElementById("status").textContent="microphone access denied";
+      mediaRec.start(500);
+    }).catch(function(e){
+      dbg("mic error: "+e.message);
       recording=false;
       document.getElementById("mic").classList.remove("recording");
     });
@@ -133,7 +147,8 @@ async function processAudio(){
   document.getElementById("status").textContent="transcribing...";
 
   // Upload audio for STT
-  var blob=new Blob(audioChunks,{type:"audio/webm"});
+  var blobType=audioChunks[0]?.type||"audio/webm";
+  var blob=new Blob(audioChunks,{type:blobType});
   try{
     document.getElementById("status").textContent="uploading audio ("+Math.round(blob.size/1024)+"kb)...";
     var sttRes=await fetch("/api/stt",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
