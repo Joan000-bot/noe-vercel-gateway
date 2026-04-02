@@ -77,7 +77,7 @@ body{font-family:'Crimson Pro','Noto Serif SC',serif;height:100vh;height:100dvh;
 </div>
 
 <script>
-var chatHist=[],timerSec=0,timerInt=null,recording=false,recognition=null,recText="";
+var chatHist=[],timerSec=0,timerInt=null,recording=false,mediaRec=null,audioChunks=[];
 
 function dbg(msg){document.getElementById("status").textContent=msg;console.log("[call]",msg)}
 
@@ -102,44 +102,54 @@ function addTranscript(role,text,zhText){
 
 function toggleMic(){
   if(recording){
-    // Stop - send accumulated text
+    // Stop recording and process
     recording=false;
     document.getElementById("mic").classList.remove("recording");
-    if(recognition)try{recognition.stop()}catch{}
-    if(recText.trim()){
-      addTranscript("user",recText.trim());
-      sendText(recText.trim());
-    }else{
-      dbg("didn't catch that, try again");
-    }
-    recText="";
+    if(mediaRec&&mediaRec.state==="recording")mediaRec.stop();
   }else{
-    // Start listening
-    if(!("webkitSpeechRecognition" in window)&&!("SpeechRecognition" in window)){
-      dbg("speech recognition not supported in this browser");
-      return;
-    }
-    recording=true;recText="";
+    // Start recording
+    recording=true;
+    audioChunks=[];
     document.getElementById("mic").classList.add("recording");
     document.getElementById("liveText").innerHTML="";
-    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    recognition=new SR();
-    recognition.lang="zh-CN";
-    recognition.interimResults=true;
-    recognition.continuous=true;
-    recognition.onresult=function(e){
-      var final="",interim="";
-      for(var i=0;i<e.results.length;i++){
-        if(e.results[i].isFinal)final+=e.results[i][0].transcript;
-        else interim+=e.results[i][0].transcript;
-      }
-      recText=final;
-      document.getElementById("liveText").innerHTML=final+'<span style="opacity:0.4">'+interim+'</span>';
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      var opts={};
+      try{["audio/webm","audio/mp4","audio/ogg"].forEach(function(m){if(!opts.mimeType&&MediaRecorder.isTypeSupported(m))opts.mimeType=m})}catch{}
+      try{mediaRec=new MediaRecorder(stream,opts)}catch(e){mediaRec=new MediaRecorder(stream)}
+      mediaRec.ondataavailable=function(e){if(e.data&&e.data.size>0)audioChunks.push(e.data)};
+      mediaRec.onstop=function(){
+        stream.getTracks().forEach(function(t){t.stop()});
+        if(audioChunks.length)processAudio();
+        else dbg("no audio captured");
+      };
+      mediaRec.start(500);
       dbg("listening... tap mic when done");
-    };
-    recognition.onend=function(){if(recording)try{recognition.start()}catch{}};
-    recognition.onerror=function(e){dbg("speech error: "+e.error)};
-    try{recognition.start();dbg("listening... speak now")}catch(e){dbg("error: "+e.message)}
+    }).catch(function(e){
+      dbg("mic error: "+e.message);
+      recording=false;
+      document.getElementById("mic").classList.remove("recording");
+    });
+  }
+}
+
+async function processAudio(){
+  var blob=new Blob(audioChunks,{type:audioChunks[0]?.type||"audio/webm"});
+  dbg("transcribing ("+Math.round(blob.size/1024)+"kb)...");
+  document.getElementById("mic").classList.add("disabled");
+  try{
+    var r=await fetch("/api/stt",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
+    var d=await r.json();
+    if(d.text){
+      document.getElementById("liveText").innerHTML=d.text;
+      addTranscript("user",d.text);
+      sendText(d.text);
+    }else{
+      dbg("didn't catch that"+(d.error?" - "+d.error:""));
+      document.getElementById("mic").classList.remove("disabled");
+    }
+  }catch(e){
+    dbg("error: "+e.message);
+    document.getElementById("mic").classList.remove("disabled");
   }
 }
 
