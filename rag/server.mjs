@@ -649,22 +649,33 @@ http.createServer(async function (req, res) {
         ttsText = enText; // TTS speaks the English part
       }
 
-      // Choose TTS voice based on response content (not input)
-      var hasChineseInResponse = /[\u4e00-\u9fff]/.test(ttsText);
-      var ttsVoice = hasChineseInResponse ? "zh-CN-YunxiNeural" : "en-US-GuyNeural";
+      // Generate TTS via ElevenLabs
+      var ELEVENLABS_KEY = "";
+      try { ELEVENLABS_KEY = fs.readFileSync("/root/elevenlabs-key.txt", "utf-8").trim(); } catch {}
 
-      // Generate TTS via Edge TTS (free)
-      var { execSync } = await import("child_process");
       var audioDir = path.join(__dirname, "public", "audio");
       fs.mkdirSync(audioDir, { recursive: true });
       var audioFile = "voice-" + Date.now() + ".mp3";
       var audioPath = path.join(audioDir, audioFile);
-      var safeTtsText = ttsText.replace(/"/g, '\\"').replace(/\n/g, " ").replace(/\[zh\]/g, "");
-      execSync('edge-tts --voice ' + ttsVoice + ' --text "' + safeTtsText + '" --write-media ' + audioPath, { timeout: 15000 });
+      var safeTtsText = ttsText.replace(/\[zh\]/g, "").trim();
 
-      return json(res, { userText: userText, noeText: noeText, enText: enText, zhText: zhText, audioUrl: "/audio/" + audioFile });
+      try {
+        var ttsRes = await fetch("https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "xi-api-key": ELEVENLABS_KEY },
+          body: JSON.stringify({ text: safeTtsText.substring(0, 2000), model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
+        });
+        if (ttsRes.ok) {
+          var ttsReader = ttsRes.body.getReader();
+          var ttsChunks = [];
+          while (true) { var { done, value } = await ttsReader.read(); if (done) break; ttsChunks.push(value); }
+          fs.writeFileSync(audioPath, Buffer.concat(ttsChunks));
+        }
+      } catch {}
+
+      return json(res, { userText: userText, noeText: noeText, enText: enText, zhText: zhText, audioUrl: fs.existsSync(audioPath) ? "/audio/" + audioFile : "" });
     } catch (e) {
-      return json(res, { error: e.message }, 500);
+      return json(res, { userText: userText, noeText: noeText || "小猫，信号不好", audioUrl: "", error: e.message });
     }
   }
 
