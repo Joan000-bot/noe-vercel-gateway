@@ -568,8 +568,8 @@ http.createServer(async function (req, res) {
     fs.writeFileSync(tmpFile, audioBuf);
     try {
       var { execSync } = await import("child_process");
-      var result = execSync("python3 /root/stt.py " + tmpFile, { timeout: 30000 }).toString().trim();
-      fs.unlinkSync(tmpFile);
+      var result = execSync("python3 /root/stt.py " + tmpFile + " 2>&1", { timeout: 30000 }).toString().trim();
+      // Keep file for debug, don't delete
       var parsed = JSON.parse(result);
       return json(res, parsed);
     } catch (e) {
