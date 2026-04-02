@@ -149,7 +149,12 @@ async function sendText(text){
   history.push({role:"user",content:text});
 
   try{
-    var r=await fetch("/api/voice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:text,history:history.slice(-20)})});
+    dbg("thinking... sending to server");
+    var controller=new AbortController();
+    var timeout=setTimeout(function(){controller.abort()},20000);
+    var r=await fetch("/api/voice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:text,history:history.slice(-20)}),signal:controller.signal});
+    clearTimeout(timeout);
+    dbg("got response, parsing...");
     var d=await r.json();
 
     if(d.noeText){
@@ -174,7 +179,8 @@ async function sendText(text){
       a.play().catch(function(){ready()});
     }else{ready()}
   }catch(e){
-    addTranscript("noe","Signal lost... try again?");
+    dbg("error: "+e.message);
+    addTranscript("noe","Signal lost... ("+e.message+")");
     ready();
   }
 }
