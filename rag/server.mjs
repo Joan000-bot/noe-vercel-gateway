@@ -555,12 +555,31 @@ http.createServer(async function (req, res) {
     var buf = Buffer.concat(chunks);
     var audioDir = path.join(__dirname, "data", "stt");
     fs.mkdirSync(audioDir, { recursive: true });
-    var ext = (req.headers["content-type"] || "").includes("mp4") ? ".mp4" : ".webm";
+
+    // Handle FormData or raw binary
+    var audioBuf = buf;
+    var ct = req.headers["content-type"] || "";
+    if (ct.includes("multipart/form-data")) {
+      // Extract file from multipart - find audio data between boundaries
+      var boundary = ct.split("boundary=")[1];
+      if (boundary) {
+        var parts = buf.toString("binary").split("--" + boundary);
+        for (var part of parts) {
+          if (part.includes("filename=")) {
+            var headerEnd = part.indexOf("\r\n\r\n");
+            if (headerEnd > 0) audioBuf = Buffer.from(part.substring(headerEnd + 4).replace(/\r\n$/, ""), "binary");
+          }
+        }
+      }
+    }
+
+    var ext = ".webm";
+    if (ct.includes("mp4") || audioBuf[4] === 0x66) ext = ".mp4"; // ftyp
     var tmpFile = path.join(audioDir, "stt-" + Date.now() + ext);
-    fs.writeFileSync(tmpFile, buf);
+    fs.writeFileSync(tmpFile, audioBuf);
     try {
       var { execSync } = await import("child_process");
-      var result = execSync("python3 /root/stt.py " + tmpFile + " 2>/dev/null", { timeout: 30000 }).toString().trim();
+      var result = execSync("python3 /root/stt.py " + tmpFile, { timeout: 30000 }).toString().trim();
       fs.unlinkSync(tmpFile);
       var parsed = JSON.parse(result);
       return json(res, parsed);

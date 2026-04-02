@@ -150,8 +150,10 @@ async function processAudio(){
   var blobType=audioChunks[0]?.type||"audio/webm";
   var blob=new Blob(audioChunks,{type:blobType});
   try{
-    document.getElementById("status").textContent="uploading audio ("+Math.round(blob.size/1024)+"kb)...";
-    var sttRes=await fetch("/api/stt",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
+    dbg("uploading "+Math.round(blob.size/1024)+"kb...");
+    var formData=new FormData();
+    formData.append("audio",blob,"recording.webm");
+    var sttRes=await fetch("/api/stt",{method:"POST",body:formData});
     var sttData=await sttRes.json();
     if(!sttData.text){
       document.getElementById("status").textContent="didn't catch that"+(sttData.error?" - "+sttData.error:"");
