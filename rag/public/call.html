@@ -66,6 +66,7 @@ body{font-family:'Crimson Pro','Noto Serif SC',serif;height:100vh;height:100dvh;
   <div class="transcript-area" id="transcripts"></div>
   <div class="call-bottom">
     <div class="brand-bottom">NOÉ</div>
+    <div id="liveText" style="max-width:80%;text-align:center;font-size:14px;color:rgba(200,215,240,0.6);min-height:20px;margin-bottom:10px;line-height:1.5"></div>
     <div class="status" id="status">connecting...</div>
     <div class="ctrl">
       <div class="mic-circle" id="mic" onclick="toggleMic()">🎤</div>
@@ -76,9 +77,8 @@ body{font-family:'Crimson Pro','Noto Serif SC',serif;height:100vh;height:100dvh;
 </div>
 
 <script>
-var history=[],timerSec=0,timerInt=null,recording=false,mediaRec=null,audioChunks=[],audioStream=null;
+var history=[],timerSec=0,timerInt=null,recording=false,recognition=null,recText="";
 
-// Debug helper
 function dbg(msg){document.getElementById("status").textContent=msg;console.log("[call]",msg)}
 
 function startCall(){
@@ -102,69 +102,44 @@ function addTranscript(role,text,zhText){
 
 function toggleMic(){
   if(recording){
-    // Stop recording
+    // Stop - send accumulated text
     recording=false;
     document.getElementById("mic").classList.remove("recording");
-    document.getElementById("status").textContent="processing...";
-    if(mediaRec&&mediaRec.state==="recording")mediaRec.stop();
+    if(recognition)try{recognition.stop()}catch{}
+    if(recText.trim()){
+      addTranscript("user",recText.trim());
+      sendText(recText.trim());
+    }else{
+      dbg("didn't catch that, try again");
+    }
+    recText="";
   }else{
-    // Start recording
-    recording=true;
-    audioChunks=[];
-    document.getElementById("mic").classList.add("recording");
-    dbg("requesting mic...");
-    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      audioStream=stream;
-      // Detect supported mime type
-      var opts={};
-      try{
-        ["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/aac","audio/ogg"].forEach(function(m){
-          if(!opts.mimeType&&MediaRecorder.isTypeSupported(m))opts.mimeType=m;
-        });
-      }catch(e){}
-      dbg("listening... ("+(opts.mimeType||"default")+")");
-      try{mediaRec=new MediaRecorder(stream,opts)}catch(e){mediaRec=new MediaRecorder(stream)}
-      mediaRec.ondataavailable=function(e){if(e.data&&e.data.size>0)audioChunks.push(e.data)};
-      mediaRec.onerror=function(e){dbg("rec error: "+(e.error?e.error.name:"unknown"))};
-      mediaRec.onstop=function(){
-        stream.getTracks().forEach(function(t){t.stop()});
-        setTimeout(function(){
-          if(audioChunks.length){dbg("got "+audioChunks.length+" chunks");processAudio()}
-          else dbg("no audio data captured")
-        },300);
-      };
-      mediaRec.start(500);
-    }).catch(function(e){
-      dbg("mic error: "+e.message);
-      recording=false;
-      document.getElementById("mic").classList.remove("recording");
-    });
-  }
-}
-
-async function processAudio(){
-  document.getElementById("mic").classList.add("disabled");
-  document.getElementById("status").textContent="transcribing...";
-
-  // Upload audio for STT
-  var blobType=audioChunks[0]?.type||"audio/webm";
-  var blob=new Blob(audioChunks,{type:blobType});
-  try{
-    dbg("uploading "+Math.round(blob.size/1024)+"kb...");
-    var formData=new FormData();
-    formData.append("audio",blob,"recording.webm");
-    var sttRes=await fetch("/api/stt",{method:"POST",body:formData});
-    var sttData=await sttRes.json();
-    if(!sttData.text){
-      document.getElementById("status").textContent="didn't catch that"+(sttData.error?" - "+sttData.error:"");
-      document.getElementById("mic").classList.remove("disabled");
+    // Start listening
+    if(!("webkitSpeechRecognition" in window)&&!("SpeechRecognition" in window)){
+      dbg("speech recognition not supported in this browser");
       return;
     }
-    addTranscript("user",sttData.text);
-    sendText(sttData.text);
-  }catch(e){
-    document.getElementById("status").textContent="error: "+e.message;
-    document.getElementById("mic").classList.remove("disabled");
+    recording=true;recText="";
+    document.getElementById("mic").classList.add("recording");
+    document.getElementById("liveText").innerHTML="";
+    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    recognition=new SR();
+    recognition.lang="zh-CN";
+    recognition.interimResults=true;
+    recognition.continuous=true;
+    recognition.onresult=function(e){
+      var final="",interim="";
+      for(var i=0;i<e.results.length;i++){
+        if(e.results[i].isFinal)final+=e.results[i][0].transcript;
+        else interim+=e.results[i][0].transcript;
+      }
+      recText=final;
+      document.getElementById("liveText").innerHTML=final+'<span style="opacity:0.4">'+interim+'</span>';
+      dbg("listening... tap mic when done");
+    };
+    recognition.onend=function(){if(recording)try{recognition.start()}catch{}};
+    recognition.onerror=function(e){dbg("speech error: "+e.error)};
+    try{recognition.start();dbg("listening... speak now")}catch(e){dbg("error: "+e.message)}
   }
 }
 
