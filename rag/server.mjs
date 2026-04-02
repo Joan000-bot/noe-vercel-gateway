@@ -630,8 +630,9 @@ http.createServer(async function (req, res) {
         ttsText = enText; // TTS speaks the English part
       }
 
-      // Choose TTS voice based on language
-      var ttsVoice = isEnglish ? "en-US-GuyNeural" : "zh-CN-YunxiNeural";
+      // Choose TTS voice based on response content (not input)
+      var hasChineseInResponse = /[\u4e00-\u9fff]/.test(ttsText);
+      var ttsVoice = hasChineseInResponse ? "zh-CN-YunxiNeural" : "en-US-GuyNeural";
 
       // Generate TTS via Edge TTS (free)
       var { execSync } = await import("child_process");
